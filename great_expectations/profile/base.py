@@ -5,7 +5,6 @@ import logging
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Optional
 
-from great_expectations._docs_decorators import public_api
 from great_expectations.core.profiler_types_mapping import ProfilerTypeMapping
 
 if TYPE_CHECKING:
@@ -59,20 +58,20 @@ class OrderedProfilerCardinality(OrderedEnum):
 
         Returns:
             The column cardinality
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         if pct_unique == 1.0:
             cardinality = cls.UNIQUE
         elif num_unique == 1:
             cardinality = cls.ONE
-        elif num_unique == 2:  # noqa: PLR2004
+        elif num_unique == 2:  # noqa: PLR2004 # FIXME CoP
             cardinality = cls.TWO
-        elif 0 < num_unique < 20:  # noqa: PLR2004
+        elif 0 < num_unique < 20:  # noqa: PLR2004 # FIXME CoP
             cardinality = cls.VERY_FEW
-        elif 0 < num_unique < 60:  # noqa: PLR2004
+        elif 0 < num_unique < 60:  # noqa: PLR2004 # FIXME CoP
             cardinality = cls.FEW
         elif num_unique is None or num_unique == 0 or pct_unique is None:
             cardinality = cls.NONE
-        elif pct_unique > 0.1:  # noqa: PLR2004
+        elif pct_unique > 0.1:  # noqa: PLR2004 # FIXME CoP
             cardinality = cls.VERY_MANY
         else:
             cardinality = cls.MANY
@@ -141,8 +140,7 @@ class Profiler(metaclass=abc.ABCMeta):
     def __init__(self, configuration: Optional[dict] = None) -> None:
         self.configuration = configuration
 
-    @public_api  # noqa: B027
-    def validate(  # empty-method-without-abstract-decorator
+    def validate(  # noqa: B027  # empty-method-without-abstract-decorator
         self, item_to_validate: Any
     ) -> None:
         """Raise an exception if `item_to_validate` cannot be profiled.

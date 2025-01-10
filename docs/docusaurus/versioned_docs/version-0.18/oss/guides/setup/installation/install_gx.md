@@ -3,8 +3,7 @@ sidebar_label: "Install GX with Data Source dependencies"
 title: "Install Great Expectations with Data Source dependencies"
 id: install_gx
 description: Install Great Expectations locally, or in a hosted environment.
-toc_min_heading_level: 2
-toc_max_heading_level: 2
+hide_table_of_contents: true
 ---
 
 import Preface from './components_local/_preface.mdx'
@@ -12,7 +11,6 @@ import CheckPythonVersion from './components_local/_check_python_version.mdx'
 import ChooseInstallationMethod from './components_local/_choose_installation_method.mdx'
 import InstallGreatExpectations from './components_local/_install_great_expectations.mdx'
 import VerifyGeInstallSucceeded from './components_local/_verify_ge_install_succeeded.mdx'
-import NextSteps from '../components/install_nextsteps.md'
 import TechnicalTag from '../../../../reference/learn/term_tags/_tag.mdx';
 import Prerequisites from '../../../../components/_prerequisites.jsx'
 import PrereqInstalledAwsCli from '../../../../components/prerequisites/_aws_installed_the_aws_cli.mdx'

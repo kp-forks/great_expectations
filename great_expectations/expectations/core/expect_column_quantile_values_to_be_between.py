@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from numbers import Number
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Type, Union
 
 import numpy as np
 
@@ -12,6 +12,7 @@ from great_expectations.expectations.expectation import (
     ColumnAggregateExpectation,
     render_suite_parameter_string,
 )
+from great_expectations.expectations.metadata_types import DataQualityIssues
 from great_expectations.render import (
     AtomicDiagnosticRendererType,
     AtomicPrescriptiveRendererType,
@@ -68,22 +69,31 @@ ALLOW_RELATIVE_ERROR_DESCRIPTION = (
     "Whether to allow relative error in quantile "
     "communications on backends that support or require it."
 )
-SUPPORTED_DATA_SOURCES = ["Pandas", "Spark", "SQLite", "PostgreSQL", "MySQL", "MSSQL", "Redshift"]
-DATA_QUALITY_ISSUES = ["Numerical Data"]
+SUPPORTED_DATA_SOURCES = [
+    "Pandas",
+    "Spark",
+    "SQLite",
+    "PostgreSQL",
+    "MySQL",
+    "MSSQL",
+    "Snowflake",
+    "BigQuery",
+]
+DATA_QUALITY_ISSUES = [DataQualityIssues.NUMERIC.value]
 
 
 class ExpectColumnQuantileValuesToBeBetween(ColumnAggregateExpectation):
     # noinspection PyUnresolvedReferences
     __doc__ = f"""{EXPECTATION_SHORT_DESCRIPTION}
 
-    expect_column_quantile_values_to_be_between is a \
-    [Column Aggregate Expectation](https://docs.greatexpectations.io/docs/guides/expectations/creating_custom_expectations/how_to_create_custom_column_aggregate_expectations).
+    ExpectColumnQuantileValuesToBeBetween is a \
+    Column Aggregate Expectation.
 
     Column Aggregate Expectations are one of the most common types of Expectation.
     They are evaluated for a single column, and produce an aggregate Metric, such as a mean, standard deviation, number of unique values, column type, etc.
     If that Metric meets the conditions you set, the Expectation considers that data valid.
 
-    expect_column_quantile_values_to_be_between can be computationally intensive for large datasets.
+    ExpectColumnQuantileValuesToBeBetween can be computationally intensive for large datasets.
 
     Args:
         column (str): \
@@ -116,11 +126,11 @@ class ExpectColumnQuantileValuesToBeBetween(ColumnAggregateExpectation):
         * details.success_details field in the result object is customized for this expectation
 
     See Also:
-        [expect_column_min_to_be_between](https://greatexpectations.io/expectations/expect_column_min_to_be_between)
-        [expect_column_max_to_be_between](https://greatexpectations.io/expectations/expect_column_max_to_be_between)
-        [expect_column_median_to_be_between](https://greatexpectations.io/expectations/expect_column_median_to_be_between)
+        [ExpectColumnMinToBeBetween](https://greatexpectations.io/expectations/expect_column_min_to_be_between)
+        [ExpectColumnMaxToBeBetween](https://greatexpectations.io/expectations/expect_column_max_to_be_between)
+        [ExpectColumnMedianToBeBetween](https://greatexpectations.io/expectations/expect_column_median_to_be_between)
 
-    Supported Datasources:
+    Supported Data Sources:
         [{SUPPORTED_DATA_SOURCES[0]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[1]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[2]}](https://docs.greatexpectations.io/docs/application_integration_support/)
@@ -128,8 +138,9 @@ class ExpectColumnQuantileValuesToBeBetween(ColumnAggregateExpectation):
         [{SUPPORTED_DATA_SOURCES[4]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[5]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[6]}](https://docs.greatexpectations.io/docs/application_integration_support/)
+        [{SUPPORTED_DATA_SOURCES[7]}](https://docs.greatexpectations.io/docs/application_integration_support/)
 
-    Data Quality Category:
+    Data Quality Issues:
         {DATA_QUALITY_ISSUES[0]}
 
     Example Data:
@@ -232,16 +243,16 @@ class ExpectColumnQuantileValuesToBeBetween(ColumnAggregateExpectation):
                   "meta": {{}},
                   "success": false
                 }}
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     quantile_ranges: QuantileRange = pydantic.Field(description=QUANTILE_RANGES_DESCRIPTION)
     allow_relative_error: Union[bool, str] = pydantic.Field(
-        False,
+        default=False,
         description=ALLOW_RELATIVE_ERROR_DESCRIPTION,
     )
 
     # This dictionary contains metadata for display in the public gallery
-    library_metadata = {
+    library_metadata: ClassVar[Dict[str, Union[str, list, bool]]] = {
         "maturity": "production",
         "tags": ["core expectation", "column aggregate expectation"],
         "contributors": ["@great_expectations"],
@@ -265,6 +276,8 @@ class ExpectColumnQuantileValuesToBeBetween(ColumnAggregateExpectation):
     )
 
     class Config:
+        title = "Expect column quantile values to be between"
+
         @staticmethod
         def schema_extra(
             schema: Dict[str, Any], model: Type[ExpectColumnQuantileValuesToBeBetween]
@@ -306,7 +319,7 @@ class ExpectColumnQuantileValuesToBeBetween(ColumnAggregateExpectation):
             raise InvalidExpectationConfigurationError(str(e))
 
         if len(quantile_ranges.quantiles) != len(quantile_ranges.value_ranges):
-            raise ValueError("quantile_values and quantiles must have the same number of elements")  # noqa: TRY003
+            raise ValueError("quantile_values and quantiles must have the same number of elements")  # noqa: TRY003 # FIXME CoP
 
         return quantile_ranges
 
@@ -666,8 +679,8 @@ class ExpectColumnQuantileValuesToBeBetween(ColumnAggregateExpectation):
                                 quantile_string if quantile_string else f"{quantile:3.2f}"
                             ),
                             "tooltip": {
-                                "content": "expect_column_quantile_values_to_be_between \n expect_column_median_to_be_between"  # noqa: E501
-                                if quantile == 0.50  # noqa: PLR2004
+                                "content": "expect_column_quantile_values_to_be_between \n expect_column_median_to_be_between"  # noqa: E501 # FIXME CoP
+                                if quantile == 0.50  # noqa: PLR2004 # FIXME CoP
                                 else "expect_column_quantile_values_to_be_between"
                             },
                         },

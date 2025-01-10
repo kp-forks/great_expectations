@@ -21,10 +21,6 @@ stores:
 # Stores are configurable places to store things like Expectations, Validations
 # Data Docs, and more. These are for advanced users only - most users can simply
 # leave this section alone.
-#
-# Three stores are required: expectations, validations, and
-# suite_parameters, and must exist with a valid store entry. Additional
-# stores can be configured for uses such as data_docs, etc.
   expectations_store:
     class_name: ExpectationsStore
     store_backend:
@@ -36,11 +32,6 @@ stores:
     store_backend:
       class_name: TupleFilesystemStoreBackend
       base_directory: uncommitted/validations/
-
-  suite_parameter_store:
-    # Suite Parameters enable dynamic expectations. Read more here:
-    # https://docs.greatexpectations.io/docs/reference/suite_parameters/
-    class_name: SuiteParameterStore
 
   checkpoint_store:
     class_name: CheckpointStore
@@ -57,7 +48,6 @@ stores:
 
 expectations_store_name: expectations_store
 validation_results_store_name: validation_results_store
-suite_parameter_store_name: suite_parameter_store
 checkpoint_store_name: checkpoint_store
 
 data_docs_sites:
@@ -93,7 +83,7 @@ def project_help_comment():
 # config_version refers to the syntactic version of this config file, and is used in maintaining backwards compatibility
 # It is auto-generated and usually does not need to be changed.
 config_version: 4
-"""  # noqa: E501
+"""  # noqa: E501 # FIXME CoP
     return PROJECT_HELP_COMMENT
 
 
@@ -104,7 +94,7 @@ def test_project_optional_config_comment_matches_default(
     """
     What does this test and why?
     Make sure that the templates built on data_context.types.base.DataContextConfigDefaults match the desired default.
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     assert project_optional_config_comment == templates.PROJECT_OPTIONAL_CONFIG_COMMENT
 
@@ -114,6 +104,6 @@ def test_project_help_comment_matches_default(project_help_comment):
     """
     What does this test and why?
     Make sure that the templates built on data_context.types.base.DataContextConfigDefaults match the desired default.
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     assert project_help_comment == templates.PROJECT_HELP_COMMENT

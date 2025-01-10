@@ -14,7 +14,7 @@ class YAMLToString(YAML):
     Get yaml dump as a string: https://yaml.readthedocs.io/en/latest/example.html#output-of-dump-as-a-string
     """
 
-    def dump(self, data, stream=None, **kw):
+    def dump(self, data, stream=None, **kw):  # type: ignore[explicit-override] # FIXME
         inefficient = False
         if not stream:
             inefficient = True
@@ -44,7 +44,7 @@ PROJECT_HELP_COMMENT = f"""
 # config_version refers to the syntactic version of this config file, and is used in maintaining backwards compatibility
 # It is auto-generated and usually does not need to be changed.
 config_version: {DataContextConfigDefaults.DEFAULT_CONFIG_VERSION.value}
-"""  # noqa: E501
+"""  # noqa: E501 # FIXME CoP
 
 CONFIG_VARIABLES_INTRO = """
 # This config file supports variable substitution which enables: 1) keeping
@@ -81,9 +81,6 @@ VALIDATIONS_STORE_STRING = yaml.dump(
         ]
     }
 ).replace("\n", "\n  ")[:-2]
-SUITE_PARAMETER_STORE_STRING = yaml.dump(
-    DataContextConfigDefaults.DEFAULT_STORES.value["suite_parameter_store"]
-)
 CHECKPOINT_STORE_STRING = yaml.dump(
     {"checkpoint_store": DataContextConfigDefaults.DEFAULT_STORES.value["checkpoint_store"]}
 ).replace("\n", "\n  ")[:-2]
@@ -108,21 +105,12 @@ stores:
 # Stores are configurable places to store things like Expectations, Validations
 # Data Docs, and more. These are for advanced users only - most users can simply
 # leave this section alone.
-#
-# Three stores are required: expectations, validations, and
-# suite_parameters, and must exist with a valid store entry. Additional
-# stores can be configured for uses such as data_docs, etc.
   {EXPECTATIONS_STORE_STRING}
   {VALIDATIONS_STORE_STRING}
-  suite_parameter_store:
-    # Suite Parameters enable dynamic expectations. Read more here:
-    # https://docs.greatexpectations.io/docs/reference/suite_parameters/
-    {SUITE_PARAMETER_STORE_STRING}
   {CHECKPOINT_STORE_STRING}
   {VALIDATION_DEFINITION_STORE_STRING}
 expectations_store_name: expectations_store
 validation_results_store_name: validation_results_store
-suite_parameter_store_name: suite_parameter_store
 checkpoint_store_name: checkpoint_store
 
 data_docs_sites:
@@ -142,17 +130,5 @@ data_docs_sites:
 """
 )
 
-USAGE_STATISTICS_ENABLED = """
-analytics_enabled: True
-"""
 
-USAGE_STATISTICS_DISABLED = """
-analytics_enabled: False
-"""
-
-PROJECT_TEMPLATE_USAGE_STATISTICS_ENABLED = (
-    PROJECT_HELP_COMMENT + PROJECT_OPTIONAL_CONFIG_COMMENT + USAGE_STATISTICS_ENABLED
-)
-PROJECT_TEMPLATE_USAGE_STATISTICS_DISABLED = (
-    PROJECT_HELP_COMMENT + PROJECT_OPTIONAL_CONFIG_COMMENT + USAGE_STATISTICS_DISABLED
-)
+PROJECT_TEMPLATE_USAGE_STATISTICS_ENABLED = PROJECT_HELP_COMMENT + PROJECT_OPTIONAL_CONFIG_COMMENT

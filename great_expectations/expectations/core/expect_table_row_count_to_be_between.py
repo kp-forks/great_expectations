@@ -6,11 +6,15 @@ from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Tuple, Type, Un
 from great_expectations.compatibility import pydantic
 from great_expectations.compatibility.typing_extensions import override
 from great_expectations.core.suite_parameters import (
-    SuiteParameterDict,  # noqa: TCH001
+    SuiteParameterDict,  # noqa: TCH001 # FIXME CoP
 )
 from great_expectations.expectations.expectation import (
     BatchExpectation,
     render_suite_parameter_string,
+)
+from great_expectations.expectations.metadata_types import DataQualityIssues
+from great_expectations.expectations.model_field_types import (
+    ConditionParser,  # noqa: TCH001 # FIXME CoP
 )
 from great_expectations.render import LegacyRendererType, RenderedStringTemplateContent
 from great_expectations.render.renderer.renderer import renderer
@@ -43,18 +47,18 @@ SUPPORTED_DATA_SOURCES = [
     "PostgreSQL",
     "MySQL",
     "MSSQL",
-    "Redshift",
     "BigQuery",
     "Snowflake",
+    "Databricks (SQL)",
 ]
-DATA_QUALITY_ISSUES = ["Volume"]
+DATA_QUALITY_ISSUES = [DataQualityIssues.VOLUME.value]
 
 
 class ExpectTableRowCountToBeBetween(BatchExpectation):
     __doc__ = f"""{EXPECTATION_SHORT_DESCRIPTION}
 
-    expect_table_row_count_to_be_between is a \
-    [Batch Expectation](https://docs.greatexpectations.io/docs/guides/expectations/creating_custom_expectations/how_to_create_custom_batch_expectations).
+    ExpectTableRowCountToBeBetween is a \
+    Batch Expectation.
 
     BatchExpectations are one of the most common types of Expectation.
     They are evaluated for an entire Batch, and answer a semantic question about the Batch itself.
@@ -89,9 +93,9 @@ class ExpectTableRowCountToBeBetween(BatchExpectation):
           no maximum.
 
     See Also:
-        [expect_table_row_count_to_equal](https://greatexpectations.io/expectations/expect_table_row_count_to_equal)
+        [ExpectTableRowCountToEqual](https://greatexpectations.io/expectations/expect_table_row_count_to_equal)
 
-    Supported Datasources:
+    Supported Data Sources:
         [{SUPPORTED_DATA_SOURCES[0]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[1]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[2]}](https://docs.greatexpectations.io/docs/application_integration_support/)
@@ -102,7 +106,7 @@ class ExpectTableRowCountToBeBetween(BatchExpectation):
         [{SUPPORTED_DATA_SOURCES[7]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[8]}](https://docs.greatexpectations.io/docs/application_integration_support/)
 
-    Data Quality Category:
+    Data Quality Issues:
         {DATA_QUALITY_ISSUES[0]}
 
     Example Data:
@@ -115,7 +119,7 @@ class ExpectTableRowCountToBeBetween(BatchExpectation):
         Passing Case:
             Input:
                 ExpectTableRowCountToBeBetween(
-                    min_value=1
+                    min_value=1,
                     max_value=4
             )
 
@@ -152,7 +156,7 @@ class ExpectTableRowCountToBeBetween(BatchExpectation):
                   "meta": {{}},
                   "success": false
                 }}
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     min_value: Union[int, SuiteParameterDict, datetime, None] = pydantic.Field(
         default=None, description=MIN_VALUE_DESCRIPTION
@@ -160,6 +164,8 @@ class ExpectTableRowCountToBeBetween(BatchExpectation):
     max_value: Union[int, SuiteParameterDict, datetime, None] = pydantic.Field(
         default=None, description=MAX_VALUE_DESCRIPTION
     )
+    row_condition: Union[str, None] = None
+    condition_parser: Union[ConditionParser, None] = None
 
     library_metadata: ClassVar[Dict[str, Union[str, list, bool]]] = {
         "maturity": "production",
@@ -183,6 +189,8 @@ class ExpectTableRowCountToBeBetween(BatchExpectation):
     )
 
     class Config:
+        title = "Expect table row count to be between"
+
         @staticmethod
         def schema_extra(
             schema: Dict[str, Any], model: Type[ExpectTableRowCountToBeBetween]
@@ -271,7 +279,7 @@ class ExpectTableRowCountToBeBetween(BatchExpectation):
         _ = runtime_configuration.get("include_column_name") is not False
         styling = runtime_configuration.get("styling")
         params = substitute_none_for_missing(
-            configuration.kwargs,  # type: ignore[union-attr]
+            configuration.kwargs,  # type: ignore[union-attr] # FIXME CoP
             [
                 "min_value",
                 "max_value",
@@ -293,17 +301,17 @@ class ExpectTableRowCountToBeBetween(BatchExpectation):
                 template_str = f"Must have {at_most_str} $max_value rows."
             elif params["max_value"] is None:
                 template_str = f"Must have {at_least_str} $min_value rows."
+            else:
+                raise ValueError("unresolvable template_str")  # noqa: TRY003 # FIXME CoP
 
         return [
             RenderedStringTemplateContent(
-                **{  # type: ignore[arg-type]
-                    "content_block_type": "string_template",
-                    "string_template": {
-                        "template": template_str,
-                        "params": params,
-                        "styling": styling,
-                    },
-                }
+                content_block_type="string_template",
+                string_template={
+                    "template": template_str,
+                    "params": params,
+                    "styling": styling,
+                },
             )
         ]
 

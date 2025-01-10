@@ -2,14 +2,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Type, Union
 
+from great_expectations.compatibility import pydantic
 from great_expectations.core.suite_parameters import (
-    SuiteParameterDict,  # noqa: TCH001
+    SuiteParameterDict,  # noqa: TCH001 # FIXME CoP
 )
 from great_expectations.expectations.expectation import (
     BatchExpectation,
     Expectation,
     render_suite_parameter_string,
 )
+from great_expectations.expectations.metadata_types import DataQualityIssues
 from great_expectations.render import LegacyRendererType, RenderedStringTemplateContent
 from great_expectations.render.renderer.renderer import renderer
 from great_expectations.render.renderer_configuration import (
@@ -36,18 +38,18 @@ SUPPORTED_DATA_SOURCES = [
     "PostgreSQL",
     "MySQL",
     "MSSQL",
-    "Redshift",
     "BigQuery",
     "Snowflake",
+    "Databricks (SQL)",
 ]
-DATA_QUALITY_ISSUES = ["Schema"]
+DATA_QUALITY_ISSUES = [DataQualityIssues.SCHEMA.value]
 
 
 class ExpectTableColumnCountToEqual(BatchExpectation):
     __doc__ = f"""{EXPECTATION_SHORT_DESCRIPTION}
 
-    expect_table_column_count_to_equal is a \
-    [Batch Expectation](https://docs.greatexpectations.io/docs/guides/expectations/creating_custom_expectations/how_to_create_custom_batch_expectations).
+    ExpectTableColumnCountToEqual is a \
+    Batch Expectation.
 
     BatchExpectations are one of the most common types of Expectation.
     They are evaluated for an entire Batch, and answer a semantic question about the Batch itself.
@@ -72,9 +74,9 @@ class ExpectTableColumnCountToEqual(BatchExpectation):
         Exact fields vary depending on the values passed to result_format, catch_exceptions, and meta.
 
     See Also:
-        [expect_table_column_count_to_be_between](https://greatexpectations.io/expectations/expect_table_column_count_to_be_between)
+        [ExpectTableColumnCountToBeBetween](https://greatexpectations.io/expectations/expect_table_column_count_to_be_between)
 
-    Supported Datasources:
+    Supported Data Sources:
         [{SUPPORTED_DATA_SOURCES[0]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[1]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[2]}](https://docs.greatexpectations.io/docs/application_integration_support/)
@@ -85,7 +87,7 @@ class ExpectTableColumnCountToEqual(BatchExpectation):
         [{SUPPORTED_DATA_SOURCES[7]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[8]}](https://docs.greatexpectations.io/docs/application_integration_support/)
 
-    Data Quality Category:
+    Data Quality Issues:
         {DATA_QUALITY_ISSUES[0]}
 
     Example Data:
@@ -134,9 +136,9 @@ class ExpectTableColumnCountToEqual(BatchExpectation):
                     "observed_value": 2
                   }}
                 }}
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
-    value: Union[int, SuiteParameterDict]
+    value: Union[int, SuiteParameterDict] = pydantic.Field(description=VALUE_DESCRIPTION)
 
     library_metadata: ClassVar[Dict[str, Union[str, list, bool]]] = {
         "maturity": "production",
@@ -155,6 +157,8 @@ class ExpectTableColumnCountToEqual(BatchExpectation):
     args_keys = ("value",)
 
     class Config:
+        title = "Expect table column count to equal"
+
         @staticmethod
         def schema_extra(schema: Dict[str, Any], model: Type[Expectation]) -> None:
             BatchExpectation.Config.schema_extra(schema, model)

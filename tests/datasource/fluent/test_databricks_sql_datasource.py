@@ -13,11 +13,11 @@ from great_expectations.datasource.fluent.databricks_sql_datasource import (
     "connection_string, expected_errors",
     [
         pytest.param(
-            "databricks://token:my_token>@my_host:1234/my_db",
+            "databricks://token:my_token>@my_host:1234",
             [
                 {
                     "loc": ("connection_string",),
-                    "msg": "ConfigStr - contains no config template strings in the format '${MY_CONFIG_VAR}' or '$MY_CONFIG_VAR'",  # noqa: E501
+                    "msg": "ConfigStr - contains no config template strings in the format '${MY_CONFIG_VAR}' or '$MY_CONFIG_VAR'",  # noqa: E501 # FIXME CoP
                     "type": "value_error",
                 },
                 {
@@ -29,11 +29,11 @@ from great_expectations.datasource.fluent.databricks_sql_datasource import (
             id="missing query",
         ),
         pytest.param(
-            "databricks://token:my_token>@my_host:1234/my_db?my_query=data",
+            "databricks://token:my_token>@my_host:1234?my_query=data",
             [
                 {
                     "loc": ("connection_string",),
-                    "msg": "ConfigStr - contains no config template strings in the format '${MY_CONFIG_VAR}' or '$MY_CONFIG_VAR'",  # noqa: E501
+                    "msg": "ConfigStr - contains no config template strings in the format '${MY_CONFIG_VAR}' or '$MY_CONFIG_VAR'",  # noqa: E501 # FIXME CoP
                     "type": "value_error",
                 },
                 {
@@ -45,11 +45,11 @@ from great_expectations.datasource.fluent.databricks_sql_datasource import (
             id="missing http_path",
         ),
         pytest.param(
-            "databricks://token:my_token>@my_host:1234/my_db?http_path=/path/a/&http_path=/path/b/",
+            "databricks://token:my_token>@my_host:1234?http_path=/path/a/&http_path=/path/b/",
             [
                 {
                     "loc": ("connection_string",),
-                    "msg": "ConfigStr - contains no config template strings in the format '${MY_CONFIG_VAR}' or '$MY_CONFIG_VAR'",  # noqa: E501
+                    "msg": "ConfigStr - contains no config template strings in the format '${MY_CONFIG_VAR}' or '$MY_CONFIG_VAR'",  # noqa: E501 # FIXME CoP
                     "type": "value_error",
                 },
                 {
@@ -61,11 +61,11 @@ from great_expectations.datasource.fluent.databricks_sql_datasource import (
             id="multiple http_paths",
         ),
         pytest.param(
-            "databricks://token:my_token>@my_host:1234/my_db?http_path=/a/b/c&schema=dev",
+            "databricks://token:my_token>@my_host:1234?http_path=/a/b/c&schema=dev",
             [
                 {
                     "loc": ("connection_string",),
-                    "msg": "ConfigStr - contains no config template strings in the format '${MY_CONFIG_VAR}' or '$MY_CONFIG_VAR'",  # noqa: E501
+                    "msg": "ConfigStr - contains no config template strings in the format '${MY_CONFIG_VAR}' or '$MY_CONFIG_VAR'",  # noqa: E501 # FIXME CoP
                     "type": "value_error",
                 },
                 {
@@ -77,11 +77,11 @@ from great_expectations.datasource.fluent.databricks_sql_datasource import (
             id="missing catalog",
         ),
         pytest.param(
-            "databricks://token:my_token>@my_host:1234/my_db?http_path=/a/b/c&catalog=dev",
+            "databricks://token:my_token>@my_host:1234?http_path=/a/b/c&catalog=dev",
             [
                 {
                     "loc": ("connection_string",),
-                    "msg": "ConfigStr - contains no config template strings in the format '${MY_CONFIG_VAR}' or '$MY_CONFIG_VAR'",  # noqa: E501
+                    "msg": "ConfigStr - contains no config template strings in the format '${MY_CONFIG_VAR}' or '$MY_CONFIG_VAR'",  # noqa: E501 # FIXME CoP
                     "type": "value_error",
                 },
                 {

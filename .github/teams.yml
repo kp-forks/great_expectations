@@ -1,32 +1,29 @@
 # To add an additional team, simply add a top-level key with a list of users.
 # NOTE - this should be kept in sync with the GX org's teams
 
-dx:
-  - "@Shinnnyshinshin" # Will Shin
-  - "@anthonyburdi" # Anthony Burdi
-
 devrel:
-  - "@Rachel-Reverie" # Rachel Reverie
-  - "@austiezr" # Austin Robinson
-  - "@kwcanuck" # Rob Gray
+  - "@JessSaavedra" # Jessica Saavedra
+  - "@Quantisan" # Paul Lam
+  - "@deborahniesz" # Deborah Niesz
+  - "@klavavej" # Kristen Lavavej
   - "@kyleaton" # Kyle Eaton
-  - "@rachhouse" # Rachel House
-  - "@talagluck" # Tal Gluck
+  - "@molliemarie" # Mollie Marie Pettit
   - "@r34ctor" # Nevin Tan
+  - "@rachhouse" # Rachel House
 
 core:
   - "@DrewHoo" # Drew Hoover
   - "@Erin-GX" # Erin Kapp
-  - "@HaebichanGX" # Haebichan Jung
-  - "@JennyTee" # Jenny Terlinden
-  - "@Kilo59" # Gabriel Gore
   - "@NathanFarmer" # Nathan Farmer
   - "@Shinnnyshinshin" # Will Shin
   - "@Super-Tanner" # Tanner Beam
   - "@TrangPham" # Thu Pham
   - "@abegong" # Abe Gong
+  - "@alena-hutchinson" # Alena Hutchinson
   - "@allensallinger" # Allen Sallinger
+  - "@annabarr" # Anna Barr
   - "@anthonyburdi" # Anthony Burdi
+  - "@ashmortar" # Aaron Ross
   - "@billdirks" # Bill Dirks
   - "@cdkini" # Chetan Kini
   - "@dctalbot" # David Talbot
@@ -36,11 +33,10 @@ core:
   - "@josectobar" # José Tobar
   - "@joshua-stauffer" # Josh Stauffer
   - "@joshzzheng" # Josh Zheng
-  - "@jshaikGX" # Javed Shaik
   - "@lockettks" # Kim Mathieu
   - "@nicgrayson" # Nic Grayson
   - "@roblim" # Rob Lim
-  - "@rreinoldsc" # Robby Reinold
+  - "@shiplet" # Michael Shiplet
   - "@sujensen" # Susan Jensen
   - "@tyler-hoffman" # Tyler Hoffman
   - "@wookasz" # Łukasz Lempart

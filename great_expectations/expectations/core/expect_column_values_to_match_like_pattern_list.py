@@ -4,11 +4,12 @@ from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Literal, Optional, 
 
 from great_expectations.compatibility import pydantic
 from great_expectations.core.suite_parameters import (
-    SuiteParameterDict,  # noqa: TCH001
+    SuiteParameterDict,  # noqa: TCH001 # FIXME CoP
 )
 from great_expectations.expectations.expectation import (
     ColumnMapExpectation,
 )
+from great_expectations.expectations.metadata_types import DataQualityIssues
 from great_expectations.expectations.model_field_descriptions import (
     COLUMN_DESCRIPTION,
     MOSTLY_DESCRIPTION,
@@ -18,6 +19,10 @@ from great_expectations.render.components import (
     RenderedStringTemplateContent,
 )
 from great_expectations.render.renderer.renderer import renderer
+from great_expectations.render.renderer_configuration import (
+    RendererConfiguration,
+    RendererValueType,
+)
 from great_expectations.render.util import num_to_str, substitute_none_for_missing
 
 if TYPE_CHECKING:
@@ -27,6 +32,7 @@ if TYPE_CHECKING:
     from great_expectations.core.expectation_validation_result import (
         ExpectationValidationResult,
     )
+    from great_expectations.render.renderer_configuration import AddParamArgs
 
 EXPECTATION_SHORT_DESCRIPTION = (
     "Expect the column entries to be strings that match any "
@@ -40,15 +46,23 @@ MATCH_ON_DESCRIPTION = (
     "Use 'any' if the value should match at least one like pattern in the list. "
     "Use 'all' if it should match each like pattern in the list."
 )
-DATA_QUALITY_ISSUES = ["Pattern Matching"]
-SUPPORTED_DATA_SOURCES = ["SQLite", "PostgreSQL", "MySQL", "MSSQL", "Redshift"]
+DATA_QUALITY_ISSUES = [DataQualityIssues.VALIDITY.value]
+SUPPORTED_DATA_SOURCES = [
+    "SQLite",
+    "PostgreSQL",
+    "MySQL",
+    "MSSQL",
+    "Databricks (SQL)",
+    "BigQuery",
+    "Snowflake",
+]
 
 
 class ExpectColumnValuesToMatchLikePatternList(ColumnMapExpectation):
     __doc__ = f"""{EXPECTATION_SHORT_DESCRIPTION}
 
-    expect_column_values_to_match_like_pattern_list is a \
-    [Column Map Expectation](https://docs.greatexpectations.io/docs/guides/expectations/creating_custom_expectations/how_to_create_custom_column_map_expectations).
+    ExpectColumnValuesToMatchLikePatternList is a \
+    Column Map Expectation.
 
     Column Map Expectations are one of the most common types of Expectation.
     They are evaluated for a single column and ask a yes/no question for every row in that column.
@@ -82,22 +96,24 @@ class ExpectColumnValuesToMatchLikePatternList(ColumnMapExpectation):
         Exact fields vary depending on the values passed to result_format, catch_exceptions, and meta.
 
     See Also:
-        [expect_column_values_to_match_regex](https://greatexpectations.io/expectations/expect_column_values_to_match_regex)
-        [expect_column_values_to_match_regex_list](https://greatexpectations.io/expectations/expect_column_values_to_match_regex_list)
-        [expect_column_values_to_not_match_regex](https://greatexpectations.io/expectations/expect_column_values_to_not_match_regex)
-        [expect_column_values_to_not_match_regex_list](https://greatexpectations.io/expectations/expect_column_values_to_not_match_regex_list)
-        [expect_column_values_to_match_like_pattern](https://greatexpectations.io/expectations/expect_column_values_to_match_like_pattern)
-        [expect_column_values_to_not_match_like_pattern](https://greatexpectations.io/expectations/expect_column_values_to_not_match_like_pattern)
-        [expect_column_values_to_not_match_like_pattern_list](https://greatexpectations.io/expectations/expect_column_values_to_not_match_like_pattern_list)
+        [ExpectColumnValuesToMatchRegex](https://greatexpectations.io/expectations/expect_column_values_to_match_regex)
+        [ExpectColumnValuesToMatchRegexList](https://greatexpectations.io/expectations/expect_column_values_to_match_regex_list)
+        [ExpectColumnValuesToNotMatchRegex](https://greatexpectations.io/expectations/expect_column_values_to_not_match_regex)
+        [ExpectColumnValuesToNotMatchRegexList](https://greatexpectations.io/expectations/expect_column_values_to_not_match_regex_list)
+        [ExpectColumnValuesToMatchLikePattern](https://greatexpectations.io/expectations/expect_column_values_to_match_like_pattern)
+        [ExpectColumnValuesToNotMatchLikePattern](https://greatexpectations.io/expectations/expect_column_values_to_not_match_like_pattern)
+        [ExpectColumnValuesToNotMatchLikePatternList](https://greatexpectations.io/expectations/expect_column_values_to_not_match_like_pattern_list)
 
-    Supported Datasources:
+    Supported Data Sources:
         [{SUPPORTED_DATA_SOURCES[0]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[1]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[2]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[3]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[4]}](https://docs.greatexpectations.io/docs/application_integration_support/)
+        [{SUPPORTED_DATA_SOURCES[5]}](https://docs.greatexpectations.io/docs/application_integration_support/)
+        [{SUPPORTED_DATA_SOURCES[6]}](https://docs.greatexpectations.io/docs/application_integration_support/)
 
-    Data Quality Category:
+    Data Quality Issues:
         {DATA_QUALITY_ISSUES[0]}
 
     Example Data:
@@ -166,7 +182,7 @@ class ExpectColumnValuesToMatchLikePatternList(ColumnMapExpectation):
                   "meta": {{}},
                   "success": false
                 }}
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     like_pattern_list: Union[List[str], SuiteParameterDict] = pydantic.Field(
         description=LIKE_PATTERN_DESCRIPTION
@@ -180,7 +196,7 @@ class ExpectColumnValuesToMatchLikePatternList(ColumnMapExpectation):
         cls, like_pattern_list: list[str] | SuiteParameterDict
     ) -> list[str] | SuiteParameterDict:
         if len(like_pattern_list) < 1:
-            raise ValueError("At least one like_pattern must be supplied in the like_pattern_list.")  # noqa: TRY003
+            raise ValueError("At least one like_pattern must be supplied in the like_pattern_list.")  # noqa: TRY003 # FIXME CoP
 
         return like_pattern_list
 
@@ -204,6 +220,8 @@ class ExpectColumnValuesToMatchLikePatternList(ColumnMapExpectation):
     )
 
     class Config:
+        title = "Expect column values to match like pattern list"
+
         @staticmethod
         def schema_extra(
             schema: Dict[str, Any], model: Type[ExpectColumnValuesToMatchLikePatternList]
@@ -233,6 +251,56 @@ class ExpectColumnValuesToMatchLikePatternList(ColumnMapExpectation):
                     },
                 }
             )
+
+    @classmethod
+    def _prescriptive_template(
+        cls,
+        renderer_configuration: RendererConfiguration,
+    ) -> RendererConfiguration:
+        add_param_args: AddParamArgs = (
+            ("column", RendererValueType.STRING),
+            ("like_pattern_list", RendererValueType.ARRAY),
+            ("match_on", RendererValueType.STRING),
+            ("mostly", RendererValueType.NUMBER),
+        )
+        for name, param_type in add_param_args:
+            renderer_configuration.add_param(name=name, param_type=param_type)
+
+        params = renderer_configuration.params
+
+        if renderer_configuration.include_column_name:
+            template_str = "$column values "
+        else:
+            template_str = "Values "
+
+        if params.match_on:
+            template_str += "must match $match_on of "
+        else:
+            template_str += "must match "
+
+        if params.like_pattern_list:
+            array_param_name = "like_pattern_list"
+            param_prefix = "like_pattern_list_"
+            renderer_configuration = cls._add_array_params(
+                array_param_name=array_param_name,
+                param_prefix=param_prefix,
+                renderer_configuration=renderer_configuration,
+            )
+            template_str += "the following like patterns: " + cls._get_array_string(
+                array_param_name=array_param_name,
+                param_prefix=param_prefix,
+                renderer_configuration=renderer_configuration,
+            )
+
+        if params.mostly and params.mostly.value < 1.0:
+            renderer_configuration = cls._add_mostly_pct_param(
+                renderer_configuration=renderer_configuration
+            )
+            template_str += " , at least $mostly_pct % of the time."
+
+        renderer_configuration.template_str = template_str
+
+        return renderer_configuration
 
     @classmethod
     @renderer(renderer_type=LegacyRendererType.PRESCRIPTIVE)

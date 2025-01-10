@@ -21,6 +21,7 @@ from great_expectations.compatibility import pydantic
 from great_expectations.data_context import (
     AbstractDataContext as GXDataContext,
 )
+from great_expectations.datasource.datasource_dict import DatasourceDict
 from great_expectations.datasource.fluent import (
     DatabricksSQLDatasource,
     FabricPowerBIDatasource,
@@ -71,7 +72,7 @@ class _FieldDetails(NamedTuple):
 
 def _get_field_details(model: Type[pydantic.BaseModel], field_name: str) -> _FieldDetails: ...
 
-class _SourceFactories:
+class DataSourceManager:
     type_lookup: ClassVar[TypeLookup]
     def __init__(self, data_context: GXDataContext) -> None: ...
     @classmethod
@@ -108,7 +109,7 @@ class _SourceFactories:
         self,
         name: str,
     ) -> None: ...
-    def add_pandas_filesystem(  # noqa: PLR0913
+    def add_pandas_filesystem(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -117,7 +118,7 @@ class _SourceFactories:
         base_directory: pathlib.Path = ...,
         data_context_root_directory: Union[pathlib.Path, None] = ...,
     ) -> PandasFilesystemDatasource: ...
-    def update_pandas_filesystem(  # noqa: PLR0913
+    def update_pandas_filesystem(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -126,7 +127,7 @@ class _SourceFactories:
         base_directory: pathlib.Path = ...,
         data_context_root_directory: Union[pathlib.Path, None] = ...,
     ) -> PandasFilesystemDatasource: ...
-    def add_or_update_pandas_filesystem(  # noqa: PLR0913
+    def add_or_update_pandas_filesystem(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -139,7 +140,7 @@ class _SourceFactories:
         self,
         name: str,
     ) -> None: ...
-    def add_pandas_dbfs(  # noqa: PLR0913
+    def add_pandas_dbfs(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -148,7 +149,7 @@ class _SourceFactories:
         base_directory: pathlib.Path = ...,
         data_context_root_directory: Union[pathlib.Path, None] = ...,
     ) -> PandasDBFSDatasource: ...
-    def update_pandas_dbfs(  # noqa: PLR0913
+    def update_pandas_dbfs(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -157,7 +158,7 @@ class _SourceFactories:
         base_directory: pathlib.Path = ...,
         data_context_root_directory: Union[pathlib.Path, None] = ...,
     ) -> PandasDBFSDatasource: ...
-    def add_or_update_pandas_dbfs(  # noqa: PLR0913
+    def add_or_update_pandas_dbfs(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -170,7 +171,7 @@ class _SourceFactories:
         self,
         name: str,
     ) -> None: ...
-    def add_pandas_s3(  # noqa: PLR0913
+    def add_pandas_s3(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -179,7 +180,7 @@ class _SourceFactories:
         bucket: str = ...,
         boto3_options: dict[str, Union[ConfigStr, Any]] = ...,
     ) -> PandasS3Datasource: ...
-    def update_pandas_s3(  # noqa: PLR0913
+    def update_pandas_s3(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -188,7 +189,7 @@ class _SourceFactories:
         bucket: str = ...,
         boto3_options: dict[str, Union[ConfigStr, Any]] = ...,
     ) -> PandasS3Datasource: ...
-    def add_or_update_pandas_s3(  # noqa: PLR0913
+    def add_or_update_pandas_s3(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -201,7 +202,7 @@ class _SourceFactories:
         self,
         name: str,
     ) -> None: ...
-    def add_pandas_gcs(  # noqa: PLR0913
+    def add_pandas_gcs(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -210,7 +211,7 @@ class _SourceFactories:
         bucket_or_name: str = ...,
         gcs_options: dict[str, Union[ConfigStr, Any]] = ...,
     ) -> PandasGoogleCloudStorageDatasource: ...
-    def update_pandas_gcs(  # noqa: PLR0913
+    def update_pandas_gcs(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -219,7 +220,7 @@ class _SourceFactories:
         bucket_or_name: str = ...,
         gcs_options: dict[str, Union[ConfigStr, Any]] = ...,
     ) -> PandasGoogleCloudStorageDatasource: ...
-    def add_or_update_pandas_gcs(  # noqa: PLR0913
+    def add_or_update_pandas_gcs(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -259,7 +260,7 @@ class _SourceFactories:
         self,
         name: str,
     ) -> None: ...
-    def add_sql(  # noqa: PLR0913
+    def add_sql(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -268,7 +269,7 @@ class _SourceFactories:
         connection_string: Union[ConfigStr, str] = ...,
         create_temp_table: bool = True,
     ) -> SQLDatasource: ...
-    def update_sql(  # noqa: PLR0913
+    def update_sql(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -277,7 +278,7 @@ class _SourceFactories:
         connection_string: Union[ConfigStr, str] = ...,
         create_temp_table: bool = True,
     ) -> SQLDatasource: ...
-    def add_or_update_sql(  # noqa: PLR0913
+    def add_or_update_sql(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -290,7 +291,7 @@ class _SourceFactories:
         self,
         name: str,
     ) -> None: ...
-    def add_postgres(  # noqa: PLR0913
+    def add_postgres(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -299,7 +300,7 @@ class _SourceFactories:
         connection_string: Union[ConfigStr, pydantic.networks.PostgresDsn, str] = ...,
         create_temp_table: bool = True,
     ) -> PostgresDatasource: ...
-    def update_postgres(  # noqa: PLR0913
+    def update_postgres(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -308,7 +309,7 @@ class _SourceFactories:
         connection_string: Union[ConfigStr, pydantic.networks.PostgresDsn, str] = ...,
         create_temp_table: bool = True,
     ) -> PostgresDatasource: ...
-    def add_or_update_postgres(  # noqa: PLR0913
+    def add_or_update_postgres(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -349,7 +350,7 @@ class _SourceFactories:
         self,
         name: str,
     ) -> None: ...
-    def add_spark_filesystem(  # noqa: PLR0913
+    def add_spark_filesystem(  # noqa: PLR0913 # FIXME CoP
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -361,7 +362,7 @@ class _SourceFactories:
         base_directory: pathlib.Path = ...,
         data_context_root_directory: Union[pathlib.Path, None] = ...,
     ) -> SparkFilesystemDatasource: ...
-    def update_spark_filesystem(  # noqa: PLR0913
+    def update_spark_filesystem(  # noqa: PLR0913 # FIXME CoP
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -373,7 +374,7 @@ class _SourceFactories:
         base_directory: pathlib.Path = ...,
         data_context_root_directory: Union[pathlib.Path, None] = ...,
     ) -> SparkFilesystemDatasource: ...
-    def add_or_update_spark_filesystem(  # noqa: PLR0913
+    def add_or_update_spark_filesystem(  # noqa: PLR0913 # FIXME CoP
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -389,7 +390,7 @@ class _SourceFactories:
         self,
         name: str,
     ) -> None: ...
-    def add_spark_dbfs(  # noqa: PLR0913
+    def add_spark_dbfs(  # noqa: PLR0913 # FIXME CoP
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -401,7 +402,7 @@ class _SourceFactories:
         base_directory: pathlib.Path = ...,
         data_context_root_directory: Union[pathlib.Path, None] = ...,
     ) -> SparkDBFSDatasource: ...
-    def update_spark_dbfs(  # noqa: PLR0913
+    def update_spark_dbfs(  # noqa: PLR0913 # FIXME CoP
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -413,7 +414,7 @@ class _SourceFactories:
         base_directory: pathlib.Path = ...,
         data_context_root_directory: Union[pathlib.Path, None] = ...,
     ) -> SparkDBFSDatasource: ...
-    def add_or_update_spark_dbfs(  # noqa: PLR0913
+    def add_or_update_spark_dbfs(  # noqa: PLR0913 # FIXME CoP
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -429,7 +430,7 @@ class _SourceFactories:
         self,
         name: str,
     ) -> None: ...
-    def add_spark_s3(  # noqa: PLR0913
+    def add_spark_s3(  # noqa: PLR0913 # FIXME CoP
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -441,7 +442,7 @@ class _SourceFactories:
         bucket: str = ...,
         boto3_options: dict[str, Union[ConfigStr, Any]] = ...,
     ) -> SparkS3Datasource: ...
-    def update_spark_s3(  # noqa: PLR0913
+    def update_spark_s3(  # noqa: PLR0913 # FIXME CoP
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -453,7 +454,7 @@ class _SourceFactories:
         bucket: str = ...,
         boto3_options: dict[str, Union[ConfigStr, Any]] = ...,
     ) -> SparkS3Datasource: ...
-    def add_or_update_spark_s3(  # noqa: PLR0913
+    def add_or_update_spark_s3(  # noqa: PLR0913 # FIXME CoP
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -469,7 +470,7 @@ class _SourceFactories:
         self,
         name: str,
     ) -> None: ...
-    def add_spark_gcs(  # noqa: PLR0913
+    def add_spark_gcs(  # noqa: PLR0913 # FIXME CoP
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -481,7 +482,7 @@ class _SourceFactories:
         bucket_or_name: str = ...,
         gcs_options: dict[str, Union[ConfigStr, Any]] = ...,
     ) -> SparkGoogleCloudStorageDatasource: ...
-    def update_spark_gcs(  # noqa: PLR0913
+    def update_spark_gcs(  # noqa: PLR0913 # FIXME CoP
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -493,7 +494,7 @@ class _SourceFactories:
         bucket_or_name: str = ...,
         gcs_options: dict[str, Union[ConfigStr, Any]] = ...,
     ) -> SparkGoogleCloudStorageDatasource: ...
-    def add_or_update_spark_gcs(  # noqa: PLR0913
+    def add_or_update_spark_gcs(  # noqa: PLR0913 # FIXME CoP
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -509,7 +510,7 @@ class _SourceFactories:
         self,
         name: str,
     ) -> None: ...
-    def add_spark_abs(  # noqa: PLR0913
+    def add_spark_abs(  # noqa: PLR0913 # FIXME CoP
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -520,7 +521,7 @@ class _SourceFactories:
         persist: bool = True,
         azure_options: dict[str, Any] = ...,
     ) -> SparkAzureBlobStorageDatasource: ...
-    def update_spark_abs(  # noqa: PLR0913
+    def update_spark_abs(  # noqa: PLR0913 # FIXME CoP
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -531,7 +532,7 @@ class _SourceFactories:
         persist: bool = True,
         azure_options: dict[str, Any] = ...,
     ) -> SparkAzureBlobStorageDatasource: ...
-    def add_or_update_spark_abs(  # noqa: PLR0913
+    def add_or_update_spark_abs(  # noqa: PLR0913 # FIXME CoP
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -546,7 +547,7 @@ class _SourceFactories:
         self,
         name: str,
     ) -> None: ...
-    def add_sqlite(  # noqa: PLR0913
+    def add_sqlite(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -555,7 +556,7 @@ class _SourceFactories:
         connection_string: Union[ConfigStr, SqliteDsn, str] = ...,
         create_temp_table: bool = True,
     ) -> SqliteDatasource: ...
-    def update_sqlite(  # noqa: PLR0913
+    def update_sqlite(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -564,7 +565,7 @@ class _SourceFactories:
         connection_string: Union[ConfigStr, SqliteDsn, str] = ...,
         create_temp_table: bool = True,
     ) -> SqliteDatasource: ...
-    def add_or_update_sqlite(  # noqa: PLR0913
+    def add_or_update_sqlite(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -695,7 +696,7 @@ class _SourceFactories:
         self,
         name: str,
     ) -> None: ...
-    def add_databricks_sql(  # noqa: PLR0913
+    def add_databricks_sql(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -704,7 +705,7 @@ class _SourceFactories:
         connection_string: Union[ConfigStr, DatabricksDsn, str] = ...,
         create_temp_table: bool = True,
     ) -> DatabricksSQLDatasource: ...
-    def update_databricks_sql(  # noqa: PLR0913
+    def update_databricks_sql(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -713,7 +714,7 @@ class _SourceFactories:
         connection_string: Union[ConfigStr, DatabricksDsn, str] = ...,
         create_temp_table: bool = True,
     ) -> DatabricksSQLDatasource: ...
-    def add_or_update_databricks_sql(  # noqa: PLR0913
+    def add_or_update_databricks_sql(
         self,
         name_or_datasource: Optional[Union[str, Datasource]] = None,
         name: Optional[str] = None,
@@ -734,6 +735,9 @@ class _SourceFactories:
         workspace: Optional[Union[uuid.UUID, str]] = None,
         dataset: Union[uuid.UUID, str] = ...,
     ) -> FabricPowerBIDatasource: ...
+    def all(self) -> DatasourceDict: ...
+    def delete(self, name: str) -> None: ...
+    def get(self, name: str) -> Datasource: ...
 
 def _iter_all_registered_types(
     include_datasource: bool = True, include_data_asset: bool = True

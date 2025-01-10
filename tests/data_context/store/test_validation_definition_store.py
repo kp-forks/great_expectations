@@ -58,13 +58,13 @@ def validation_definition(
     context = in_memory_runtime_context
     batch_definition = (
         context.data_sources.add_pandas("my_datasource")
-        .add_csv_asset("my_asset", "data.csv")  # type: ignore[arg-type]
+        .add_csv_asset("my_asset", "data.csv")  # type: ignore[arg-type] # FIXME CoP
         .add_batch_definition("my_batch_definition")
     )
     return ValidationDefinition(
         name="my_validation",
         data=batch_definition,
-        suite=ExpectationSuite(name="my_suite"),
+        suite=context.suites.add(ExpectationSuite(name="my_suite")),
     )
 
 
@@ -101,31 +101,22 @@ def test_add_cloud(
 
     mock_put.assert_called_once_with(
         mock.ANY,  # requests Session
-        f"https://api.greatexpectations.io/organizations/12345678-1234-5678-1234-567812345678/validation-definitions/{id}",
+        f"https://api.greatexpectations.io/api/v1/organizations/12345678-1234-5678-1234-567812345678/validation-definitions/{id}",
         json={
             "data": {
-                "type": "validation_definition",
-                "id": id,
-                "attributes": {
-                    "organization_id": "12345678-1234-5678-1234-567812345678",
-                    "validation_definition": {
-                        "name": name,
-                        "id": None,
-                        "data": {
-                            "id": None,
-                            "name": "my_batch_definition",
-                            "partitioner": None,
-                        },
-                        "suite": {
-                            "name": "my_suite",
-                            "id": None,
-                            "expectations": [],
-                            "meta": mock.ANY,  # GX version information
-                            "notes": None,
-                        },
-                    },
+                "name": name,
+                "data": {
+                    # NOTE: IDs here are unrealistic because the validation_definition
+                    # was created via the in-memory store
+                    "batch_definition": {"id": mock.ANY, "name": "my_batch_definition"},
+                    "asset": {"id": mock.ANY, "name": "my_asset"},
+                    "datasource": {"id": mock.ANY, "name": "my_datasource"},
                 },
-            }
+                "suite": {
+                    "name": "my_suite",
+                    "id": mock.ANY,
+                },
+            },
         },
     )
 
@@ -142,8 +133,8 @@ def test_get_key(request, store_fixture: str):
 @pytest.mark.cloud
 def test_get_key_cloud(cloud_backed_store: ValidationDefinitionStore):
     key = cloud_backed_store.get_key(name="my_validation")
-    assert key.resource_type == GXCloudRESTResource.VALIDATION_DEFINITION  # type: ignore[union-attr]
-    assert key.resource_name == "my_validation"  # type: ignore[union-attr]
+    assert key.resource_type == GXCloudRESTResource.VALIDATION_DEFINITION  # type: ignore[union-attr] # FIXME CoP
+    assert key.resource_name == "my_validation"  # type: ignore[union-attr] # FIXME CoP
 
 
 _VALIDATION_ID = "a4sdfd-64c8-46cb-8f7e-03c12cea1d67"
@@ -177,10 +168,8 @@ _VALIDATION_DEFINITION = {
         pytest.param(
             {
                 "data": {
+                    **_VALIDATION_DEFINITION,
                     "id": _VALIDATION_ID,
-                    "attributes": {
-                        "validation_definition": _VALIDATION_DEFINITION,
-                    },
                 }
             },
             id="single_validation_definition",
@@ -189,10 +178,8 @@ _VALIDATION_DEFINITION = {
             {
                 "data": [
                     {
+                        **_VALIDATION_DEFINITION,
                         "id": _VALIDATION_ID,
-                        "attributes": {
-                            "validation_definition": _VALIDATION_DEFINITION,
-                        },
                     }
                 ]
             },

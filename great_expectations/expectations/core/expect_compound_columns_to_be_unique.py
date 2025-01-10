@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Sequence, Type, Union
 
+from great_expectations.compatibility import pydantic
 from great_expectations.expectations.expectation import (
     MulticolumnMapExpectation,
     render_suite_parameter_string,
 )
-from great_expectations.expectations.model_field_descriptions import MOSTLY_DESCRIPTION
+from great_expectations.expectations.metadata_types import DataQualityIssues
+from great_expectations.expectations.model_field_descriptions import (
+    COLUMN_LIST_DESCRIPTION,
+    MOSTLY_DESCRIPTION,
+)
 from great_expectations.render import LegacyRendererType, RenderedStringTemplateContent
 from great_expectations.render.renderer.renderer import renderer
 from great_expectations.render.renderer_configuration import (
@@ -29,7 +34,6 @@ if TYPE_CHECKING:
     from great_expectations.render.renderer_configuration import AddParamArgs
 
 EXPECTATION_SHORT_DESCRIPTION = "Expect the compound columns to be unique."
-COLUMN_LIST_DESCRIPTION = "Set of columns to be checked."
 SUPPORTED_DATA_SOURCES = [
     "Pandas",
     "Spark",
@@ -37,18 +41,18 @@ SUPPORTED_DATA_SOURCES = [
     "PostgreSQL",
     "MySQL",
     "MSSQL",
-    "Redshift",
     "BigQuery",
     "Snowflake",
+    "Databricks (SQL)",
 ]
-DATA_QUALITY_ISSUES = ["Cardinality"]
+DATA_QUALITY_ISSUES = [DataQualityIssues.UNIQUENESS.value]
 
 
 class ExpectCompoundColumnsToBeUnique(MulticolumnMapExpectation):
     __doc__ = f"""{EXPECTATION_SHORT_DESCRIPTION}
 
-    expect_compound_columns_to_be_unique is a \
-    [Multicolumn Map Expectation](https://docs.greatexpectations.io/docs/guides/expectations/creating_custom_expectations/how_to_create_custom_multicolumn_map_expectations).
+    ExpectCompoundColumnsToBeUnique is a \
+    Multicolumn Map Expectation.
 
     Multicolumn Map Expectations are evaluated for a set of columns and ask a yes/no question about the row-wise relationship between those columns.
     Based on the result, they then calculate the percentage of rows that gave a positive answer.
@@ -79,7 +83,7 @@ class ExpectCompoundColumnsToBeUnique(MulticolumnMapExpectation):
 
         Exact fields vary depending on the values passed to result_format, catch_exceptions, and meta.
 
-    Supported Datasources:
+    Supported Data Sources:
         [{SUPPORTED_DATA_SOURCES[0]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[1]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[2]}](https://docs.greatexpectations.io/docs/application_integration_support/)
@@ -90,7 +94,7 @@ class ExpectCompoundColumnsToBeUnique(MulticolumnMapExpectation):
         [{SUPPORTED_DATA_SOURCES[7]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[8]}](https://docs.greatexpectations.io/docs/application_integration_support/)
 
-    Data Quality Category:
+    Data Quality Issues:
         {DATA_QUALITY_ISSUES[0]}
 
     Example Data:
@@ -166,9 +170,9 @@ class ExpectCompoundColumnsToBeUnique(MulticolumnMapExpectation):
                   "meta": {{}},
                   "success": false
                 }}
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
-    column_list: Sequence[str]
+    column_list: Sequence[str] = pydantic.Field(description=COLUMN_LIST_DESCRIPTION)
 
     # This dictionary contains metadata for display in the public gallery
     library_metadata: ClassVar[Dict[str, Union[str, list, bool]]] = {
@@ -190,6 +194,8 @@ class ExpectCompoundColumnsToBeUnique(MulticolumnMapExpectation):
     args_keys = ("column_list",)
 
     class Config:
+        title = "Expect compound columns to be unique"
+
         @staticmethod
         def schema_extra(
             schema: Dict[str, Any], model: Type[ExpectCompoundColumnsToBeUnique]
@@ -239,7 +245,7 @@ class ExpectCompoundColumnsToBeUnique(MulticolumnMapExpectation):
             renderer_configuration = cls._add_mostly_pct_param(
                 renderer_configuration=renderer_configuration
             )
-            template_str = "Values for given compound columns must be unique together, at least $mostly_pct % of the time: "  # noqa: E501
+            template_str = "Values for given compound columns must be unique together, at least $mostly_pct % of the time: "  # noqa: E501 # FIXME CoP
         else:
             template_str = "Values for given compound columns must be unique together: "
 
@@ -287,7 +293,7 @@ class ExpectCompoundColumnsToBeUnique(MulticolumnMapExpectation):
 
         if params["mostly"] is not None and params["mostly"] < 1.0:
             params["mostly_pct"] = num_to_str(params["mostly"] * 100, no_scientific=True)
-            template_str = "Values for given compound columns must be unique together, at least $mostly_pct % of the time: "  # noqa: E501
+            template_str = "Values for given compound columns must be unique together, at least $mostly_pct % of the time: "  # noqa: E501 # FIXME CoP
         else:
             template_str = "Values for given compound columns must be unique together: "
 

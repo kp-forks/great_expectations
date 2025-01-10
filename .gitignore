@@ -154,3 +154,9 @@ Pipfile.lock
 tests/integration/cloud/rest_contracts/pacts
 
 .databricks
+
+# Local Netlify folder
+.netlify
+
+# mercury container volume
+assets/docker/mercury/volume/

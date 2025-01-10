@@ -11,11 +11,11 @@ from pyparsing import (
     Combine,
     Literal,
     ParseException,
+    QuotedString,
     Regex,
     Suppress,
     Word,
     alphanums,
-    alphas,
 )
 
 import great_expectations.exceptions as gx_exceptions
@@ -23,7 +23,7 @@ from great_expectations.compatibility.pyspark import functions as F
 from great_expectations.compatibility.sqlalchemy import sqlalchemy as sa
 from great_expectations.compatibility.typing_extensions import override
 from great_expectations.types import SerializableDictDot
-from great_expectations.util import convert_to_json_serializable  # noqa: TID251
+from great_expectations.util import convert_to_json_serializable  # noqa: TID251 # FIXME CoP
 
 if TYPE_CHECKING:
     from great_expectations.compatibility import pyspark, sqlalchemy
@@ -34,11 +34,7 @@ def _set_notnull(s, l, t) -> None:  # noqa: E741 # ambiguous name `l`
 
 
 WHITESPACE_CHARS = " \t"
-column_name = Combine(
-    Suppress(Literal('col("'))
-    + Word(alphas, f"{alphanums}_-.").setResultsName("column")
-    + Suppress(Literal('")'))
-)
+column_name = Combine(Literal("col(") + QuotedString('"').setResultsName("column") + Literal(")"))
 gt = Literal(">")
 lt = Literal("<")
 ge = Literal(">=")
@@ -74,8 +70,7 @@ class RowConditionParserType(enum.Enum):
     """Type of condition or parser to be used to interpret a RowCondition
 
     Note that many of these are forward looking and are not yet implemented.
-    In the future `GE` can replace the `great_expectations__experimental__`
-    name for the condition_parser and this enum can be used internally
+    In the future this enum can be used internally
     instead of strings for the condition_parser user input.
     """
 
@@ -121,11 +116,11 @@ def _parse_great_expectations_condition(row_condition: str):
     try:
         return condition.parseString(row_condition)
     except ParseException:
-        raise ConditionParserError(f"unable to parse condition: {row_condition}")  # noqa: TRY003
+        raise ConditionParserError(f"unable to parse condition: {row_condition}")  # noqa: TRY003 # FIXME CoP
 
 
 # noinspection PyUnresolvedReferences
-def parse_condition_to_spark(  # type: ignore[return] # return or raise exists for all branches  # noqa: C901, PLR0911
+def parse_condition_to_spark(  # type: ignore[return] # return or raise exists for all branches  # noqa: C901, PLR0911 # FIXME CoP
     row_condition: str,
 ) -> pyspark.Column:
     parsed = _parse_great_expectations_condition(row_condition)
@@ -134,7 +129,7 @@ def parse_condition_to_spark(  # type: ignore[return] # return or raise exists f
         if parsed["op"] == "==":
             return F.col(column) == parsed["condition_value"]
         else:
-            raise ConditionParserError(  # noqa: TRY003
+            raise ConditionParserError(  # noqa: TRY003 # FIXME CoP
                 f"Invalid operator: {parsed['op']} for string literal spark condition."
             )
     elif "fnumber" in parsed:
@@ -156,7 +151,7 @@ def parse_condition_to_spark(  # type: ignore[return] # return or raise exists f
     elif "notnull" in parsed and parsed["notnull"] is True:
         return F.col(column).isNotNull()
     else:
-        raise ConditionParserError(f"unrecognized column condition: {row_condition}")  # noqa: TRY003
+        raise ConditionParserError(f"unrecognized column condition: {row_condition}")  # noqa: TRY003 # FIXME CoP
 
 
 def generate_condition_by_operator(column, op, value):
@@ -193,4 +188,4 @@ def parse_condition_to_sqlalchemy(
     elif "notnull" in parsed and parsed["notnull"] is True:
         return sa.not_(sa.column(column).is_(None))
     else:
-        raise ConditionParserError(f"unrecognized column condition: {row_condition}")  # noqa: TRY003
+        raise ConditionParserError(f"unrecognized column condition: {row_condition}")  # noqa: TRY003 # FIXME CoP

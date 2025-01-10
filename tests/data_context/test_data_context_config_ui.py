@@ -24,7 +24,7 @@ from great_expectations.util import filter_properties_dict
 What does this test and why?
 
 This file will hold various tests to ensure that the UI functions as expected when creating a DataContextConfig object. It will ensure that the appropriate defaults are used, including when the store_backend_defaults parameter is set.
-"""  # noqa: E501
+"""  # noqa: E501 # FIXME CoP
 
 _DEFAULT_CONFIG_VERSION: Final[float] = float(
     DataContextConfigDefaults.DEFAULT_CONFIG_VERSION.value
@@ -42,9 +42,8 @@ def construct_data_context_config():
     def _construct_data_context_config(
         data_context_id: str,
         config_version: float = _DEFAULT_CONFIG_VERSION,
-        expectations_store_name: str = DataContextConfigDefaults.DEFAULT_EXPECTATIONS_STORE_NAME.value,  # noqa: E501
-        validation_results_store_name: str = DataContextConfigDefaults.DEFAULT_VALIDATIONS_STORE_NAME.value,  # noqa: E501
-        suite_parameter_store_name: str = DataContextConfigDefaults.DEFAULT_SUITE_PARAMETER_STORE_NAME.value,  # noqa: E501
+        expectations_store_name: str = DataContextConfigDefaults.DEFAULT_EXPECTATIONS_STORE_NAME.value,  # noqa: E501 # FIXME CoP
+        validation_results_store_name: str = DataContextConfigDefaults.DEFAULT_VALIDATIONS_STORE_NAME.value,  # noqa: E501 # FIXME CoP
         checkpoint_store_name: str = DataContextConfigDefaults.DEFAULT_CHECKPOINT_STORE_NAME.value,
         fluent_datasources: Optional[Dict] = None,
         plugins_directory: Optional[str] = None,
@@ -61,7 +60,6 @@ def construct_data_context_config():
             "expectations_store_name": expectations_store_name,
             "fluent_datasources": fluent_datasources,
             "validation_results_store_name": validation_results_store_name,
-            "suite_parameter_store_name": suite_parameter_store_name,
             "checkpoint_store_name": checkpoint_store_name,
             "plugins_directory": plugins_directory,
             "stores": stores,
@@ -124,7 +122,6 @@ def test_DataContextConfig_with_S3StoreBackendDefaults(construct_data_context_co
 
     # Create desired config
     desired_stores_config = {
-        "suite_parameter_store": {"class_name": "SuiteParameterStore"},
         "expectations_S3_store": {
             "class_name": "ExpectationsStore",
             "store_backend": {
@@ -177,7 +174,6 @@ def test_DataContextConfig_with_S3StoreBackendDefaults(construct_data_context_co
         data_context_id=data_context_config.data_context_id,
         expectations_store_name="expectations_S3_store",
         validation_results_store_name="validation_results_S3_store",
-        suite_parameter_store_name=DataContextConfigDefaults.DEFAULT_SUITE_PARAMETER_STORE_NAME.value,
         checkpoint_store_name="checkpoint_S3_store",
         stores=desired_stores_config,
         data_docs_sites=desired_data_docs_sites_config,
@@ -221,7 +217,6 @@ def test_DataContextConfig_with_S3StoreBackendDefaults_using_all_parameters(
         checkpoint_store_prefix="custom_checkpoint_store_prefix",
         expectations_store_name="custom_expectations_S3_store_name",
         validation_results_store_name="custom_validation_results_S3_store_name",
-        suite_parameter_store_name="custom_suite_parameter_store_name",
         checkpoint_store_name="custom_checkpoint_S3_store_name",
     )
     data_context_config = DataContextConfig(
@@ -230,7 +225,6 @@ def test_DataContextConfig_with_S3StoreBackendDefaults_using_all_parameters(
 
     # Create desired config
     desired_stores_config = {
-        "custom_suite_parameter_store_name": {"class_name": "SuiteParameterStore"},
         "custom_expectations_S3_store_name": {
             "class_name": "ExpectationsStore",
             "store_backend": {
@@ -283,7 +277,6 @@ def test_DataContextConfig_with_S3StoreBackendDefaults_using_all_parameters(
         data_context_id=data_context_config.data_context_id,
         expectations_store_name="custom_expectations_S3_store_name",
         validation_results_store_name="custom_validation_results_S3_store_name",
-        suite_parameter_store_name="custom_suite_parameter_store_name",
         checkpoint_store_name="custom_checkpoint_S3_store_name",
         stores=desired_stores_config,
         data_docs_sites=desired_data_docs_sites_config,
@@ -313,7 +306,7 @@ def test_DataContextConfig_with_FilesystemStoreBackendDefaults_and_simple_defaul
     What does this test and why?
     Ensure that a very simple DataContextConfig setup using FilesystemStoreBackendDefaults is created accurately
     This test sets the root_dir parameter
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     test_root_directory = "test_root_dir"
 
@@ -360,14 +353,14 @@ def test_DataContextConfig_with_FilesystemStoreBackendDefaults_and_simple_defaul
 
 
 @pytest.mark.unit
-def test_DataContextConfig_with_FilesystemStoreBackendDefaults_and_simple_defaults_no_root_directory(  # noqa: E501
+def test_DataContextConfig_with_FilesystemStoreBackendDefaults_and_simple_defaults_no_root_directory(  # noqa: E501 # FIXME CoP
     construct_data_context_config,
 ):
     """
     What does this test and why?
     Ensure that a very simple DataContextConfig setup using FilesystemStoreBackendDefaults is created accurately
     This test does not set the optional root_directory parameter
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     store_backend_defaults = FilesystemStoreBackendDefaults()
     data_context_config = DataContextConfig(
@@ -415,7 +408,6 @@ def test_DataContextConfig_with_GCSStoreBackendDefaults(construct_data_context_c
     # Create desired config
     data_context_id = data_context_config.data_context_id
     desired_stores_config = {
-        "suite_parameter_store": {"class_name": "SuiteParameterStore"},
         "expectations_GCS_store": {
             "class_name": "ExpectationsStore",
             "store_backend": {
@@ -474,7 +466,6 @@ def test_DataContextConfig_with_GCSStoreBackendDefaults(construct_data_context_c
         expectations_store_name="expectations_GCS_store",
         validation_results_store_name="validation_results_GCS_store",
         checkpoint_store_name="checkpoint_GCS_store",
-        suite_parameter_store_name=DataContextConfigDefaults.DEFAULT_SUITE_PARAMETER_STORE_NAME.value,
         stores=desired_stores_config,
         data_docs_sites=desired_data_docs_sites_config,
     )
@@ -522,7 +513,6 @@ def test_DataContextConfig_with_GCSStoreBackendDefaults_using_all_parameters(
         checkpoint_store_prefix="custom_checkpoint_store_prefix",
         expectations_store_name="custom_expectations_GCS_store_name",
         validation_results_store_name="custom_validation_results_GCS_store_name",
-        suite_parameter_store_name="custom_suite_parameter_store_name",
         checkpoint_store_name="custom_checkpoint_GCS_store_name",
     )
     data_context_config = DataContextConfig(
@@ -531,7 +521,6 @@ def test_DataContextConfig_with_GCSStoreBackendDefaults_using_all_parameters(
 
     # Create desired config
     desired_stores_config = {
-        "custom_suite_parameter_store_name": {"class_name": "SuiteParameterStore"},
         "custom_expectations_GCS_store_name": {
             "class_name": "ExpectationsStore",
             "store_backend": {
@@ -588,7 +577,6 @@ def test_DataContextConfig_with_GCSStoreBackendDefaults_using_all_parameters(
         data_context_id=data_context_config.data_context_id,
         expectations_store_name="custom_expectations_GCS_store_name",
         validation_results_store_name="custom_validation_results_GCS_store_name",
-        suite_parameter_store_name="custom_suite_parameter_store_name",
         checkpoint_store_name="custom_checkpoint_GCS_store_name",
         stores=desired_stores_config,
         data_docs_sites=desired_data_docs_sites_config,
@@ -616,7 +604,7 @@ def test_DataContextConfig_with_DatabaseStoreBackendDefaults(construct_data_cont
     What does this test and why?
     Make sure that using DatabaseStoreBackendDefaults as the store_backend_defaults applies appropriate
     defaults, including default_credentials getting propagated to stores and not data_docs
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     store_backend_defaults = DatabaseStoreBackendDefaults(
         default_credentials={
@@ -634,7 +622,6 @@ def test_DataContextConfig_with_DatabaseStoreBackendDefaults(construct_data_cont
 
     # Create desired config
     desired_stores_config = {
-        "suite_parameter_store": {"class_name": "SuiteParameterStore"},
         "expectations_database_store": {
             "class_name": "ExpectationsStore",
             "store_backend": {
@@ -711,7 +698,6 @@ def test_DataContextConfig_with_DatabaseStoreBackendDefaults(construct_data_cont
         expectations_store_name="expectations_database_store",
         validation_results_store_name="validation_results_database_store",
         checkpoint_store_name="checkpoint_database_store",
-        suite_parameter_store_name=DataContextConfigDefaults.DEFAULT_SUITE_PARAMETER_STORE_NAME.value,
         stores=desired_stores_config,
         data_docs_sites=desired_data_docs_sites_config,
     )
@@ -777,7 +763,6 @@ def test_DataContextConfig_with_DatabaseStoreBackendDefaults_using_all_parameter
         },
         expectations_store_name="custom_expectations_database_store_name",
         validation_results_store_name="custom_validation_results_database_store_name",
-        suite_parameter_store_name="custom_suite_parameter_store_name",
         checkpoint_store_name="custom_checkpoint_database_store_name",
     )
     data_context_config = DataContextConfig(
@@ -786,7 +771,6 @@ def test_DataContextConfig_with_DatabaseStoreBackendDefaults_using_all_parameter
 
     # Create desired config
     desired_stores_config = {
-        "custom_suite_parameter_store_name": {"class_name": "SuiteParameterStore"},
         "custom_expectations_database_store_name": {
             "class_name": "ExpectationsStore",
             "store_backend": {
@@ -862,7 +846,6 @@ def test_DataContextConfig_with_DatabaseStoreBackendDefaults_using_all_parameter
         data_context_id=data_context_config.data_context_id,
         expectations_store_name="custom_expectations_database_store_name",
         validation_results_store_name="custom_validation_results_database_store_name",
-        suite_parameter_store_name="custom_suite_parameter_store_name",
         checkpoint_store_name="custom_checkpoint_database_store_name",
         stores=desired_stores_config,
         data_docs_sites=desired_data_docs_sites_config,
@@ -891,7 +874,7 @@ def test_override_general_defaults(
     """
     What does this test and why?
     A DataContextConfig should be able to be created by passing items into the constructor that override any defaults.
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     data_context_config = DataContextConfig(
         config_version=999,
@@ -930,7 +913,6 @@ def test_override_general_defaults(
                     "prefix": "REPLACE_ME",
                 },
             },
-            "custom_suite_parameter_store": {"class_name": "SuiteParameterStore"},
             "checkpoint_S3_store": {
                 "class_name": "CheckpointStore",
                 "store_backend": {
@@ -942,7 +924,6 @@ def test_override_general_defaults(
         },
         expectations_store_name="custom_expectations_store_name",
         validation_results_store_name="custom_validation_results_store_name",
-        suite_parameter_store_name="custom_suite_parameter_store_name",
         checkpoint_store_name="checkpoint_S3_store",
         data_docs_sites={
             "s3_site": {
@@ -970,7 +951,6 @@ def test_override_general_defaults(
     )
 
     desired_stores = {
-        "custom_suite_parameter_store": {"class_name": "SuiteParameterStore"},
         "expectations_S3_store": {
             "class_name": "ExpectationsStore",
             "store_backend": {
@@ -1045,7 +1025,6 @@ def test_override_general_defaults(
         config_version=999.0,
         expectations_store_name="custom_expectations_store_name",
         validation_results_store_name="custom_validation_results_store_name",
-        suite_parameter_store_name="custom_suite_parameter_store_name",
         checkpoint_store_name="checkpoint_S3_store",
         stores=desired_stores,
         data_docs_sites=desired_data_docs_sites_config,
@@ -1089,7 +1068,6 @@ def test_DataContextConfig_with_S3StoreBackendDefaults_and_simple_defaults_with_
 
     # Create desired config
     desired_stores_config = {
-        "suite_parameter_store": {"class_name": "SuiteParameterStore"},
         "expectations_S3_store": {
             "class_name": "ExpectationsStore",
             "store_backend": {
@@ -1143,7 +1121,6 @@ def test_DataContextConfig_with_S3StoreBackendDefaults_and_simple_defaults_with_
         expectations_store_name="expectations_S3_store",
         validation_results_store_name="validation_results_S3_store",
         checkpoint_store_name="checkpoint_S3_store",
-        suite_parameter_store_name=DataContextConfigDefaults.DEFAULT_SUITE_PARAMETER_STORE_NAME.value,
         stores=desired_stores_config,
         data_docs_sites=desired_data_docs_sites_config,
     )
@@ -1178,14 +1155,12 @@ def test_DataContextConfig_with_InMemoryStoreBackendDefaults(
         "data_context_id": data_context_config.data_context_id,
         "checkpoint_store_name": "checkpoint_store",
         "config_version": 4.0,
-        "suite_parameter_store_name": "suite_parameter_store",
         "expectations_store_name": "expectations_store",
         "stores": {
             "checkpoint_store": {
                 "class_name": "CheckpointStore",
                 "store_backend": {"class_name": "InMemoryStoreBackend"},
             },
-            "suite_parameter_store": {"class_name": "SuiteParameterStore"},
             "expectations_store": {
                 "class_name": "ExpectationsStore",
                 "store_backend": {"class_name": "InMemoryStoreBackend"},
@@ -1228,7 +1203,6 @@ def test_data_context_config_defaults():
         "config_variables_file_path": None,
         "config_version": 4,
         "data_docs_sites": None,
-        "suite_parameter_store_name": None,
         "expectations_store_name": None,
         "fluent_datasources": {},
         "plugins_directory": None,

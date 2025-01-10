@@ -3,8 +3,7 @@ sidebar_label: "Configure Expectation Stores"
 title: "Configure Expectation Stores"
 id: configure_expectation_stores
 description: Configure storage locations for Expectations.
-toc_min_heading_level: 2
-toc_max_heading_level: 2
+hide_table_of_contents: true
 ---
 
 import Preface from './components_how_to_configure_an_expectation_store_in_amazon_s3/_preface.mdx'
@@ -119,7 +118,7 @@ stores:
         connection_string: ${AZURE_STORAGE_CONNECTION_STRING}
 ```
 
-:::note
+:::note Note
 If the container for [hosting and sharing Data Docs on Azure Blob Storage](../../setup/configuring_data_docs/host_and_share_data_docs.md) is named ``$web``, use ``container: \$web`` to allow access to the ``$web``container.
 :::
 
@@ -212,7 +211,7 @@ In the following example, `expectations_store_name` is set to ``expectations_GCS
 ```yaml title="YAML" name="docs/docusaurus/docs/oss/guides/setup/configuring_metadata_stores/how_to_configure_an_expectation_store_in_gcs.py configured_expectations_store_yaml"
 ```
 
-:::warning
+:::warning Warning
 If you are also storing [Validations in GCS](./configure_result_stores.md) or [DataDocs in GCS](../configuring_data_docs/host_and_share_data_docs.md), make sure that the ``prefix`` values are disjoint and one is not a substring of the other.
 :::
 

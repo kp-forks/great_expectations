@@ -11,8 +11,8 @@ from great_expectations.datasource.fluent.sql_datasource import SQLDatasource
 def test_expect_table_row_count_to_be_between_runtime_custom_query_no_temp_table_sa(
     titanic_v013_multi_datasource_multi_execution_engine_data_context_with_checkpoints_v1_with_empty_store_stats_enabled,
 ):
-    context = titanic_v013_multi_datasource_multi_execution_engine_data_context_with_checkpoints_v1_with_empty_store_stats_enabled  # noqa: E501
-    datasource = context.datasources["my_sqlite_db_datasource"]
+    context = titanic_v013_multi_datasource_multi_execution_engine_data_context_with_checkpoints_v1_with_empty_store_stats_enabled  # noqa: E501 # FIXME CoP
+    datasource = context.data_sources.all()["my_sqlite_db_datasource"]
     assert isinstance(datasource, SQLDatasource)
 
     batch = (
@@ -50,8 +50,8 @@ def test_expect_table_row_count_to_be_between_runtime_custom_query_no_temp_table
 def test_expect_table_row_count_to_be_between_runtime_custom_query_with_where_no_temp_table_sa(
     titanic_v013_multi_datasource_multi_execution_engine_data_context_with_checkpoints_v1_with_empty_store_stats_enabled,
 ):
-    context = titanic_v013_multi_datasource_multi_execution_engine_data_context_with_checkpoints_v1_with_empty_store_stats_enabled  # noqa: E501
-    datasource = context.datasources["my_sqlite_db_datasource"]
+    context = titanic_v013_multi_datasource_multi_execution_engine_data_context_with_checkpoints_v1_with_empty_store_stats_enabled  # noqa: E501 # FIXME CoP
+    datasource = context.data_sources.all()["my_sqlite_db_datasource"]
     assert isinstance(datasource, SQLDatasource)
 
     batch = (

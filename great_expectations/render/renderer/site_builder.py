@@ -6,7 +6,7 @@ import pathlib
 import traceback
 import urllib
 from collections import OrderedDict
-from typing import Any, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
 from great_expectations import exceptions
 from great_expectations.core import ExpectationSuite
@@ -24,6 +24,12 @@ from great_expectations.data_context.types.resource_identifiers import (
 )
 from great_expectations.data_context.util import instantiate_class_from_config
 from great_expectations.render.util import resource_key_passes_run_name_filter
+
+if TYPE_CHECKING:
+    from great_expectations.core.expectation_validation_result import (
+        ExpectationValidationResult,
+    )
+    from great_expectations.data_context import AbstractDataContext
 
 logger = logging.getLogger(__name__)
 
@@ -114,9 +120,9 @@ class SiteBuilder:
                         class_name: DefaultJinjaIndexPageView
     """
 
-    def __init__(  # noqa: C901, PLR0912, PLR0913
+    def __init__(  # noqa: C901, PLR0912, PLR0913 # FIXME CoP
         self,
-        data_context,
+        data_context: AbstractDataContext,
         store_backend,
         site_name=None,
         site_index_builder=None,
@@ -142,21 +148,21 @@ class SiteBuilder:
         # set custom_styles_directory if present
         custom_styles_directory = None
         plugins_directory = data_context.plugins_directory
-        if plugins_directory and os.path.isdir(  # noqa: PTH112
-            os.path.join(  # noqa: PTH118
+        if plugins_directory and os.path.isdir(  # noqa: PTH112 # FIXME CoP
+            os.path.join(  # noqa: PTH118 # FIXME CoP
                 plugins_directory, "custom_data_docs", "styles"
             )
         ):
-            custom_styles_directory = os.path.join(  # noqa: PTH118
+            custom_styles_directory = os.path.join(  # noqa: PTH118 # FIXME CoP
                 plugins_directory, "custom_data_docs", "styles"
             )
 
         # set custom_views_directory if present
         custom_views_directory = None
-        if plugins_directory and os.path.isdir(  # noqa: PTH112
-            os.path.join(plugins_directory, "custom_data_docs", "views")  # noqa: PTH118
+        if plugins_directory and os.path.isdir(  # noqa: PTH112 # FIXME CoP
+            os.path.join(plugins_directory, "custom_data_docs", "views")  # noqa: PTH118 # FIXME CoP
         ):
-            custom_views_directory = os.path.join(  # noqa: PTH118
+            custom_views_directory = os.path.join(  # noqa: PTH118 # FIXME CoP
                 plugins_directory, "custom_data_docs", "views"
             )
 
@@ -316,7 +322,7 @@ class SiteBuilder:
             index_links_dict,
         )
 
-    def get_resource_url(self, resource_identifier=None, only_if_exists=True):
+    def get_resource_url(self, resource_identifier=None, only_if_exists=True) -> Optional[str]:
         """
         Return the URL of the HTML document that renders a resource
         (e.g., an expectation suite or a validation result).
@@ -334,10 +340,10 @@ class SiteBuilder:
 
 
 class DefaultSiteSectionBuilder:
-    def __init__(  # noqa: PLR0913
+    def __init__(  # noqa: PLR0913 # FIXME CoP
         self,
         name,
-        data_context,
+        data_context: AbstractDataContext,
         target_store,
         source_store_name,
         custom_styles_directory=None,
@@ -366,7 +372,7 @@ class DefaultSiteSectionBuilder:
         self.cloud_mode = cloud_mode
         self.ge_cloud_mode = cloud_mode
         if renderer is None:
-            raise exceptions.InvalidConfigError(  # noqa: TRY003
+            raise exceptions.InvalidConfigError(  # noqa: TRY003 # FIXME CoP
                 "SiteSectionBuilder requires a renderer configuration " "with a class_name key."
             )
         module_name = renderer.get("module_name") or "great_expectations.render.renderer"
@@ -404,7 +410,7 @@ class DefaultSiteSectionBuilder:
                 class_name=view["class_name"],
             )
 
-    def build(self, resource_identifiers=None) -> None:  # noqa: C901, PLR0912
+    def build(self, resource_identifiers=None) -> None:  # noqa: C901, PLR0912 # FIXME CoP
         source_store_keys = self.source_store.list_keys()
         if self.name == "validations" and self.validation_results_limit:
             source_store_keys = sorted(
@@ -447,7 +453,7 @@ class DefaultSiteSectionBuilder:
                     )
                 else:
                     logger.debug(
-                        f"        Rendering validation: run name: {run_name}, run time: {run_time}, suite {expectation_suite_name} for batch {resource_key.batch_identifier}"  # noqa: E501
+                        f"        Rendering validation: run name: {run_name}, run time: {run_time}, suite {expectation_suite_name} for batch {resource_key.batch_identifier}"  # noqa: E501 # FIXME CoP
                     )
 
             try:
@@ -479,20 +485,20 @@ class DefaultSiteSectionBuilder:
 An unexpected Exception occurred during data docs rendering.  Because of this error, certain parts of data docs will \
 not be rendered properly and/or may not appear altogether.  Please use the trace, included in this message, to \
 diagnose and repair the underlying issue.  Detailed information follows:
-                """  # noqa: E501
+                """  # noqa: E501 # FIXME CoP
                 exception_traceback = traceback.format_exc()
                 exception_message += (
                     f'{type(e).__name__}: "{e!s}".  ' f'Traceback: "{exception_traceback}".'
                 )
-                logger.error(exception_message)  # noqa: TRY400
+                logger.error(exception_message)  # noqa: TRY400 # FIXME CoP
 
 
 class DefaultSiteIndexBuilder:
-    def __init__(  # noqa: PLR0913
+    def __init__(  # noqa: PLR0913 # FIXME CoP
         self,
         name,
         site_name,
-        data_context,
+        data_context: AbstractDataContext,
         target_store,
         site_section_builders_config,
         custom_styles_directory=None,
@@ -556,7 +562,7 @@ class DefaultSiteIndexBuilder:
                 class_name=view["class_name"],
             )
 
-    def add_resource_info_to_index_links_dict(  # noqa: PLR0913
+    def add_resource_info_to_index_links_dict(  # noqa: PLR0913 # FIXME CoP
         self,
         index_links_dict,
         expectation_suite_name,
@@ -595,7 +601,7 @@ class DefaultSiteIndexBuilder:
 
         url_encoded_filepath = urllib.parse.quote(filepath)
 
-        expectation_suite_filepath = os.path.join(  # noqa: PTH118
+        expectation_suite_filepath = os.path.join(  # noqa: PTH118 # FIXME CoP
             "expectations", *expectation_suite_name.split(".")
         )
         expectation_suite_filepath += ".html"
@@ -650,7 +656,7 @@ class DefaultSiteIndexBuilder:
         #     )
 
         return {
-            "header": "To continue exploring Great Expectations check out one of these tutorials...",  # noqa: E501
+            "header": "To continue exploring Great Expectations check out one of these tutorials...",  # noqa: E501 # FIXME CoP
             "buttons": self._get_call_to_action_buttons(usage_statistics),
         }
 
@@ -709,7 +715,7 @@ class DefaultSiteIndexBuilder:
         be skipped and removed from the target store
         :param build_index: a flag if False, skips building the index page
         :return: tuple(index_page_url, index_links_dict)
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
 
         # Loop over sections in the HtmlStore
         logger.debug("DefaultSiteIndexBuilder.build")
@@ -747,12 +753,12 @@ class DefaultSiteIndexBuilder:
 An unexpected Exception occurred during data docs rendering.  Because of this error, certain parts of data docs will \
 not be rendered properly and/or may not appear altogether.  Please use the trace, included in this message, to \
 diagnose and repair the underlying issue.  Detailed information follows:
-            """  # noqa: E501
+            """  # noqa: E501 # FIXME CoP
             exception_traceback = traceback.format_exc()
             exception_message += (
                 f'{type(e).__name__}: "{e!s}".  Traceback: "{exception_traceback}".'
             )
-            logger.error(exception_message)  # noqa: TRY400
+            logger.error(exception_message)  # noqa: TRY400 # FIXME CoP
 
         return self.target_store.write_index_page(viewable_content), index_links_dict
 
@@ -866,13 +872,12 @@ diagnose and repair the underlying issue.  Detailed information follows:
                         run_id=profiling_result_key.run_id,
                         run_time=profiling_result_key.run_id.run_time,
                         run_name=profiling_result_key.run_id.run_name,
-                        asset_name=batch_kwargs.get("data_asset_name")
-                        or batch_spec.get("data_asset_name"),
+                        asset_name=_resolve_asset_name(validation),
                         batch_kwargs=batch_kwargs,
                         batch_spec=batch_spec,
                     )
                 except Exception:
-                    error_msg = f"Profiling result not found: {profiling_result_key.to_tuple()!s:s} - skipping"  # noqa: E501
+                    error_msg = f"Profiling result not found: {profiling_result_key.to_tuple()!s:s} - skipping"  # noqa: E501 # FIXME CoP
                     logger.warning(error_msg)
 
     def _add_validations_to_index_links(
@@ -923,14 +928,30 @@ diagnose and repair the underlying issue.  Detailed information follows:
                         validation_success=validation_success,
                         run_time=validation_result_key.run_id.run_time,
                         run_name=validation_result_key.run_id.run_name,
-                        asset_name=batch_kwargs.get("data_asset_name")
-                        or batch_spec.get("data_asset_name"),
+                        asset_name=_resolve_asset_name(validation),
                         batch_kwargs=batch_kwargs,
                         batch_spec=batch_spec,
                     )
                 except Exception:
-                    error_msg = f"Validation result not found: {validation_result_key.to_tuple()!s:s} - skipping"  # noqa: E501
+                    error_msg = f"Validation result not found: {validation_result_key.to_tuple()!s:s} - skipping"  # noqa: E501 # FIXME CoP
                     logger.warning(error_msg)
+
+
+def _resolve_asset_name(validation_results: ExpectationValidationResult) -> str | None:
+    """
+    Resolve the asset name from the validation results meta data.
+    FDS does not store data_asset_name in batch_kwargs or batch_spec and it must be
+    pulled from the active batch definition.
+    """
+    batch_kwargs = validation_results.meta.get("batch_kwargs", {})
+    batch_spec = validation_results.meta.get("batch_spec", {})
+
+    asset_name = batch_kwargs.get("data_asset_name") or batch_spec.get("data_asset_name")
+    if asset_name:
+        return asset_name
+    # FDS does not store data_asset_name in batch_kwargs or batch_spec
+    active_batch = validation_results.meta.get("active_batch_definition", {})
+    return active_batch.get("data_asset_name")
 
 
 class CallToActionButton:

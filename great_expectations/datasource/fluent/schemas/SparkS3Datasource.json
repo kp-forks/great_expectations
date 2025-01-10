@@ -1,6 +1,6 @@
 {
     "title": "SparkS3Datasource",
-    "description": "--Public API--",
+    "description": "--Public API--\nSparkS3Datasource is a subclass of SparkDatasource which connects to\nAmazon S3.",
     "type": "object",
     "properties": {
         "type": {
@@ -109,7 +109,13 @@
                     {
                         "type": "string",
                         "writeOnly": true,
-                        "format": "password"
+                        "format": "password",
+                        "description": "Contains config templates to be substituted at runtime. Runtime values will never be serialized.",
+                        "pattern": ".*(?<!\\\\)\\$\\{(.*?)\\}|(?<!\\\\)\\$([_a-zA-Z][_a-zA-Z0-9]*).*",
+                        "examples": [
+                            "hello_${NAME}",
+                            "${MY_CFG_VAR}"
+                        ]
                     },
                     {}
                 ]
@@ -149,18 +155,27 @@
                     "type": "string",
                     "format": "regex"
                 },
-                "sort_ascending": {
-                    "title": "Sort Ascending",
-                    "default": true,
-                    "type": "boolean"
-                },
                 "param_names": {
                     "title": "Param Names",
                     "default": [
                         "year"
                     ],
                     "type": "array",
-                    "items": {}
+                    "minItems": 1,
+                    "maxItems": 1,
+                    "items": [
+                        {
+                            "enum": [
+                                "year"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                },
+                "sort_ascending": {
+                    "title": "Sort Ascending",
+                    "default": true,
+                    "type": "boolean"
                 }
             },
             "required": [
@@ -176,11 +191,6 @@
                     "type": "string",
                     "format": "regex"
                 },
-                "sort_ascending": {
-                    "title": "Sort Ascending",
-                    "default": true,
-                    "type": "boolean"
-                },
                 "param_names": {
                     "title": "Param Names",
                     "default": [
@@ -188,7 +198,27 @@
                         "month"
                     ],
                     "type": "array",
-                    "items": {}
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": [
+                        {
+                            "enum": [
+                                "year"
+                            ],
+                            "type": "string"
+                        },
+                        {
+                            "enum": [
+                                "month"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                },
+                "sort_ascending": {
+                    "title": "Sort Ascending",
+                    "default": true,
+                    "type": "boolean"
                 }
             },
             "required": [
@@ -204,11 +234,6 @@
                     "type": "string",
                     "format": "regex"
                 },
-                "sort_ascending": {
-                    "title": "Sort Ascending",
-                    "default": true,
-                    "type": "boolean"
-                },
                 "param_names": {
                     "title": "Param Names",
                     "default": [
@@ -217,7 +242,33 @@
                         "day"
                     ],
                     "type": "array",
-                    "items": {}
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "items": [
+                        {
+                            "enum": [
+                                "year"
+                            ],
+                            "type": "string"
+                        },
+                        {
+                            "enum": [
+                                "month"
+                            ],
+                            "type": "string"
+                        },
+                        {
+                            "enum": [
+                                "day"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                },
+                "sort_ascending": {
+                    "title": "Sort Ascending",
+                    "default": true,
+                    "type": "boolean"
                 }
             },
             "required": [
@@ -233,6 +284,13 @@
                     "type": "string",
                     "format": "regex"
                 },
+                "param_names": {
+                    "title": "Param Names",
+                    "default": [],
+                    "type": "array",
+                    "minItems": 0,
+                    "maxItems": 0
+                },
                 "sort_ascending": {
                     "title": "Sort Ascending",
                     "default": true,
@@ -245,7 +303,7 @@
         },
         "BatchDefinition_Union_FileNamePartitionerYearly__FileNamePartitionerMonthly__FileNamePartitionerDaily__FileNamePartitionerPath__": {
             "title": "BatchDefinition[Union[FileNamePartitionerYearly, FileNamePartitionerMonthly, FileNamePartitionerDaily, FileNamePartitionerPath]]",
-            "description": "Configuration for a batch of data.\n\nReferences the DataAsset to be used, and any additional parameters needed to fetch the data.",
+            "description": "--Public API--Configuration for a batch of data.\n\nReferences the DataAsset to be used, and any additional parameters needed to fetch the data.",
             "type": "object",
             "properties": {
                 "id": {
@@ -280,7 +338,7 @@
         },
         "CSVAsset": {
             "title": "CSVAsset",
-            "description": "Base class for PathDataAssets which batch by applying a regex to file names.",
+            "description": "--Public API--Base class for PathDataAssets which batch by applying a regex to file names.",
             "type": "object",
             "properties": {
                 "name": {
@@ -581,7 +639,6 @@
         },
         "PartitionerColumnValue": {
             "title": "PartitionerColumnValue",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "column_name": {
@@ -608,7 +665,6 @@
         },
         "PartitionerMultiColumnValue": {
             "title": "PartitionerMultiColumnValue",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "column_names": {
@@ -638,7 +694,6 @@
         },
         "PartitionerDividedInteger": {
             "title": "PartitionerDividedInteger",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "divisor": {
@@ -670,7 +725,6 @@
         },
         "PartitionerModInteger": {
             "title": "PartitionerModInteger",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "mod": {
@@ -702,7 +756,6 @@
         },
         "ColumnPartitionerYearly": {
             "title": "ColumnPartitionerYearly",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "column_name": {
@@ -729,7 +782,6 @@
         },
         "ColumnPartitionerMonthly": {
             "title": "ColumnPartitionerMonthly",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "column_name": {
@@ -756,7 +808,6 @@
         },
         "ColumnPartitionerDaily": {
             "title": "ColumnPartitionerDaily",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "column_name": {
@@ -783,7 +834,6 @@
         },
         "PartitionerDatetimePart": {
             "title": "PartitionerDatetimePart",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "datetime_parts": {
@@ -818,7 +868,6 @@
         },
         "PartitionerConvertedDatetime": {
             "title": "PartitionerConvertedDatetime",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "column_name": {
@@ -850,7 +899,7 @@
         },
         "BatchDefinition_Union_PartitionerColumnValue__PartitionerMultiColumnValue__PartitionerDividedInteger__PartitionerModInteger__ColumnPartitionerYearly__ColumnPartitionerMonthly__ColumnPartitionerDaily__PartitionerDatetimePart__PartitionerConvertedDatetime__": {
             "title": "BatchDefinition[Union[PartitionerColumnValue, PartitionerMultiColumnValue, PartitionerDividedInteger, PartitionerModInteger, ColumnPartitionerYearly, ColumnPartitionerMonthly, ColumnPartitionerDaily, PartitionerDatetimePart, PartitionerConvertedDatetime]]",
-            "description": "Configuration for a batch of data.\n\nReferences the DataAsset to be used, and any additional parameters needed to fetch the data.",
+            "description": "--Public API--Configuration for a batch of data.\n\nReferences the DataAsset to be used, and any additional parameters needed to fetch the data.",
             "type": "object",
             "properties": {
                 "id": {
@@ -900,7 +949,7 @@
         },
         "DirectoryCSVAsset": {
             "title": "DirectoryCSVAsset",
-            "description": "Base class for PathDataAssets which batch by combining the contents of a directory.",
+            "description": "--Public API--Base class for PathDataAssets which batch by combining the contents of a directory.",
             "type": "object",
             "properties": {
                 "name": {
@@ -1207,7 +1256,7 @@
         },
         "ParquetAsset": {
             "title": "ParquetAsset",
-            "description": "Base class for PathDataAssets which batch by applying a regex to file names.",
+            "description": "--Public API--Base class for PathDataAssets which batch by applying a regex to file names.",
             "type": "object",
             "properties": {
                 "name": {
@@ -1332,7 +1381,7 @@
         },
         "DirectoryParquetAsset": {
             "title": "DirectoryParquetAsset",
-            "description": "Base class for PathDataAssets which batch by combining the contents of a directory.",
+            "description": "--Public API--Base class for PathDataAssets which batch by combining the contents of a directory.",
             "type": "object",
             "properties": {
                 "name": {
@@ -1463,7 +1512,7 @@
         },
         "ORCAsset": {
             "title": "ORCAsset",
-            "description": "Base class for PathDataAssets which batch by applying a regex to file names.",
+            "description": "--Public API--Base class for PathDataAssets which batch by applying a regex to file names.",
             "type": "object",
             "properties": {
                 "name": {
@@ -1571,7 +1620,7 @@
         },
         "DirectoryORCAsset": {
             "title": "DirectoryORCAsset",
-            "description": "Base class for PathDataAssets which batch by combining the contents of a directory.",
+            "description": "--Public API--Base class for PathDataAssets which batch by combining the contents of a directory.",
             "type": "object",
             "properties": {
                 "name": {
@@ -1685,7 +1734,7 @@
         },
         "JSONAsset": {
             "title": "JSONAsset",
-            "description": "Base class for PathDataAssets which batch by applying a regex to file names.",
+            "description": "--Public API--Base class for PathDataAssets which batch by applying a regex to file names.",
             "type": "object",
             "properties": {
                 "name": {
@@ -1957,7 +2006,7 @@
         },
         "DirectoryJSONAsset": {
             "title": "DirectoryJSONAsset",
-            "description": "Base class for PathDataAssets which batch by combining the contents of a directory.",
+            "description": "--Public API--Base class for PathDataAssets which batch by combining the contents of a directory.",
             "type": "object",
             "properties": {
                 "name": {
@@ -2235,7 +2284,7 @@
         },
         "TextAsset": {
             "title": "TextAsset",
-            "description": "Base class for PathDataAssets which batch by applying a regex to file names.",
+            "description": "--Public API--Base class for PathDataAssets which batch by applying a regex to file names.",
             "type": "object",
             "properties": {
                 "name": {
@@ -2340,7 +2389,7 @@
         },
         "DirectoryTextAsset": {
             "title": "DirectoryTextAsset",
-            "description": "Base class for PathDataAssets which batch by combining the contents of a directory.",
+            "description": "--Public API--Base class for PathDataAssets which batch by combining the contents of a directory.",
             "type": "object",
             "properties": {
                 "name": {
@@ -2451,7 +2500,7 @@
         },
         "DeltaAsset": {
             "title": "DeltaAsset",
-            "description": "Base class for PathDataAssets which batch by applying a regex to file names.",
+            "description": "--Public API--Base class for PathDataAssets which batch by applying a regex to file names.",
             "type": "object",
             "properties": {
                 "name": {
@@ -2511,7 +2560,7 @@
         },
         "DirectoryDeltaAsset": {
             "title": "DirectoryDeltaAsset",
-            "description": "Base class for PathDataAssets which batch by combining the contents of a directory.",
+            "description": "--Public API--Base class for PathDataAssets which batch by combining the contents of a directory.",
             "type": "object",
             "properties": {
                 "name": {

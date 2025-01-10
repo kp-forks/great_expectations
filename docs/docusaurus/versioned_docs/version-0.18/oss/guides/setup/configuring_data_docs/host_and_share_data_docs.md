@@ -3,8 +3,7 @@ sidebar_label: "Host and share Data Docs"
 title: "Host and share Data Docs"
 id: host_and_share_data_docs
 description: Host and share Data Docs stored on a filesystem or a Data Source.
-toc_min_heading_level: 2
-toc_max_heading_level: 2
+hide_table_of_contents: true
 ---
 
 import Preface from './components_how_to_host_and_share_data_docs_on_amazon_s3/_preface.mdx'
@@ -130,8 +129,8 @@ To review additional options for configuring the ``config_variables.yml`` file o
 
 2. Optional. Replace the default ``local_site`` to maintain a single Azure Data Docs site.
 
-:::note
- Since the container is named ``$web``, setting ``container: $web`` in ``great_expectations.yml`` would cause GX to unsuccessfully try to find the ``web`` variable in ``config_variables.yml``. Use an escape char ``\`` before the ``$`` so the [substitute_config_variable](https://legacy.docs.greatexpectations.io/en/latest/autoapi/great_expectations/data_context/util/index.html?highlight=substitute_config_variable#great_expectations.data_context.util.substitute_config_variable) can locate the ``$web`` container.
+:::note Note
+ Since the container is named ``$web``, setting ``container: $web`` in ``great_expectations.yml`` would cause GX to unsuccessfully try to find the ``web`` variable in ``config_variables.yml``. Use an escape char ``\`` before the ``$`` so the ``substitute_config_variable`` can locate the ``$web`` container.
 :::
 
 You can also configure GX to store your <TechnicalTag relative="../../../" tag="expectation" text="Expectations" /> and <TechnicalTag relative="../../../" tag="validation_result" text="Validation Results" /> in the Azure Storage account.

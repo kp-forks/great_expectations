@@ -7,10 +7,10 @@ import pytest
 
 import great_expectations as gx
 import great_expectations.expectations as gxe
-from great_expectations import project_manager
 from great_expectations.checkpoint import Checkpoint
 from great_expectations.core.expectation_suite import ExpectationSuite
 from great_expectations.core.validation_definition import ValidationDefinition
+from great_expectations.data_context.data_context.context_factory import project_manager
 from great_expectations.datasource.fluent.interfaces import Datasource
 
 if TYPE_CHECKING:
@@ -44,7 +44,7 @@ def data_context_with_connection_to_metrics_db(
         ],
 
     It is used by tests for unexpected_index_list (ID/Primary Key).
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     project_path = tmp_path / "test_configuration"
     context = gx.get_context(mode="file", project_root_dir=project_path)
@@ -87,7 +87,8 @@ def expect_column_values_to_be_in_set() -> gxe.ExpectColumnValuesToBeInSet:
 @pytest.fixture
 def expect_column_values_to_not_be_in_set() -> gxe.ExpectColumnValuesToNotBeInSet:
     return gxe.ExpectColumnValuesToNotBeInSet(
-        column="animals", value_set=["giraffe", "lion", "zebra"]
+        column="animals",
+        value_set=["giraffe", "lion", "zebra"],
     )
 
 
@@ -111,13 +112,13 @@ def _build_checkpoint_and_run(
         suite=ExpectationSuite(name="metrics_exp", expectations=expectations)
     )
 
-    ds = context.get_datasource("my_datasource")
+    ds = context.data_sources.get("my_datasource")
     assert isinstance(ds, Datasource)
     asset = ds.get_asset(asset_name)
     batch_definition = asset.add_batch_definition(name="my_batch_def")
 
-    validation_definition = ValidationDefinition(
-        name="my_validation_def", suite=suite, data=batch_definition
+    validation_definition = context.validation_definitions.add(
+        ValidationDefinition(name="my_validation_def", suite=suite, data=batch_definition)
     )
 
     checkpoint = Checkpoint(
@@ -205,7 +206,7 @@ def test_sql_result_format_in_checkpoint_pk_defined_one_expectation_complete_out
 
 
 @pytest.mark.filesystem
-def test_sql_result_format_in_checkpoint_pk_defined_column_pair_expectation_complete_output_with_query(  # noqa: E501
+def test_sql_result_format_in_checkpoint_pk_defined_column_pair_expectation_complete_output_with_query(  # noqa: E501 # FIXME CoP
     data_context_with_connection_to_metrics_db: FileDataContext,
     expect_column_pair_values_to_be_equal: gxe.ExpectColumnPairValuesToBeEqual,
 ):
@@ -240,7 +241,7 @@ def test_sql_result_format_in_checkpoint_pk_defined_column_pair_expectation_comp
     unexpected_index_query = evrs[0]["results"][0]["result"]["unexpected_index_query"]
     assert (
         unexpected_index_query
-        == "SELECT pk_1, ordered_item, received_item \nFROM column_pairs \nWHERE NOT (ordered_item = received_item AND NOT (ordered_item IS NULL OR received_item IS NULL));"  # noqa: E501
+        == "SELECT pk_1, ordered_item, received_item \nFROM column_pairs \nWHERE NOT (ordered_item = received_item AND NOT (ordered_item IS NULL OR received_item IS NULL));"  # noqa: E501 # FIXME CoP
     )
 
 
@@ -277,7 +278,7 @@ def test_sql_result_format_in_checkpoint_pk_defined_column_pair_expectation_summ
 
 
 @pytest.mark.filesystem
-def test_sql_result_format_in_checkpoint_pk_defined_multi_column_sum_expectation_complete_output_with_query(  # noqa: E501
+def test_sql_result_format_in_checkpoint_pk_defined_multi_column_sum_expectation_complete_output_with_query(  # noqa: E501 # FIXME CoP
     data_context_with_connection_to_metrics_db: FileDataContext,
     expect_multicolumn_sum_to_equal: gxe.ExpectMulticolumnSumToEqual,
 ):
@@ -553,5 +554,5 @@ def test_sql_complete_output_no_id_pk_fallback(
     # query does not contain id_pk column
     assert (
         unexpected_index_query
-        == "SELECT animals \nFROM animal_names \nWHERE animals IS NOT NULL AND (animals NOT IN ('cat', 'fish', 'dog'));"  # noqa: E501
+        == "SELECT animals \nFROM animal_names \nWHERE animals IS NOT NULL AND (animals NOT IN ('cat', 'fish', 'dog'));"  # noqa: E501 # FIXME CoP
     )

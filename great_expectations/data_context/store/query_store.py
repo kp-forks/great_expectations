@@ -17,7 +17,7 @@ if sa:
     if is_version_greater_or_equal(sa.__version__, "1.4.0"):
         url_create_fn = sqlalchemy.URL.create
     else:
-        url_create_fn = sqlalchemy.URL
+        url_create_fn = sqlalchemy.URL  # type: ignore[assignment] # FIXME CoP
 
 
 logger = logging.getLogger(__name__)
@@ -25,11 +25,11 @@ logger = logging.getLogger(__name__)
 
 class SqlAlchemyQueryStore(Store):
     """SqlAlchemyQueryStore stores queries by name, and makes it possible to retrieve the resulting value by query
-    name."""  # noqa: E501
+    name."""  # noqa: E501 # FIXME CoP
 
     _key_class: ClassVar[Type] = StringKey
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         credentials,
         queries=None,
@@ -38,7 +38,7 @@ class SqlAlchemyQueryStore(Store):
         store_name=None,
     ) -> None:
         if not sa:
-            raise gx_exceptions.DataContextError(  # noqa: TRY003
+            raise gx_exceptions.DataContextError(  # noqa: TRY003 # FIXME CoP
                 "sqlalchemy module not found, but is required for " "SqlAlchemyQueryStore"
             )
         super().__init__(
@@ -47,7 +47,7 @@ class SqlAlchemyQueryStore(Store):
             store_name=store_name,
         )
         if queries:
-            # If queries are defined in configuration, then we load them into an InMemoryStoreBackend  # noqa: E501
+            # If queries are defined in configuration, then we load them into an InMemoryStoreBackend  # noqa: E501 # FIXME CoP
             try:
                 assert isinstance(
                     queries, dict
@@ -55,7 +55,7 @@ class SqlAlchemyQueryStore(Store):
                 assert (
                     store_backend is None or store_backend["class_name"] == "InMemoryStoreBackend"
                 ), (
-                    "If queries are provided in configuration, then store_backend must be empty or an "  # noqa: E501
+                    "If queries are provided in configuration, then store_backend must be empty or an "  # noqa: E501 # FIXME CoP
                     "InMemoryStoreBackend"
                 )
                 for k, v in queries.items():
@@ -75,8 +75,8 @@ class SqlAlchemyQueryStore(Store):
             options = url_create_fn(drivername, **credentials)
             self.engine = sa.create_engine(options)
 
-        # Gather the call arguments of the present function (include the "module_name" and add the "class_name"), filter  # noqa: E501
-        # out the Falsy values, and set the instance "_config" variable equal to the resulting dictionary.  # noqa: E501
+        # Gather the call arguments of the present function (include the "module_name" and add the "class_name"), filter  # noqa: E501 # FIXME CoP
+        # out the Falsy values, and set the instance "_config" variable equal to the resulting dictionary.  # noqa: E501 # FIXME CoP
         self._config = {
             "credentials": credentials,
             "queries": queries,
@@ -93,10 +93,10 @@ class SqlAlchemyQueryStore(Store):
             return StringKey(key)
         return key
 
-    def get(self, key):
+    def get(self, key):  # type: ignore[explicit-override] # FIXME
         return super().get(self._convert_key(key))
 
-    def set(self, key, value):
+    def set(self, key, value):  # type: ignore[explicit-override] # FIXME
         return super().set(self._convert_key(key), value)
 
     def get_query_result(self, key, query_parameters=None):
@@ -107,7 +107,7 @@ class SqlAlchemyQueryStore(Store):
             query = result.get("query")
             return_type = result.get("return_type", "list")
             if return_type not in ["list", "scalar"]:
-                raise ValueError(  # noqa: TRY003
+                raise ValueError(  # noqa: TRY003 # FIXME CoP
                     "The return_type of a SqlAlchemyQueryStore query must be one of either 'list' "
                     "or 'scalar'"
                 )

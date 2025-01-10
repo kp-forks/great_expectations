@@ -12,20 +12,26 @@ from pytest import param
 from great_expectations.compatibility import sqlalchemy
 from great_expectations.compatibility.sqlalchemy import sqlalchemy as sa
 from great_expectations.datasource.fluent import GxDatasourceWarning, SQLDatasource
-from great_expectations.datasource.fluent.sql_datasource import TableAsset
+from great_expectations.datasource.fluent.sql_datasource import (
+    DEFAULT_QUOTE_CHARACTERS,
+    TableAsset,
+    to_lower_if_not_quoted,
+)
 from great_expectations.execution_engine import SqlAlchemyExecutionEngine
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-    from great_expectations.data_context import EphemeralDataContext
+    from great_expectations.data_context import (
+        EphemeralDataContext,
+    )
 
 
 LOGGER = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def create_engine_spy(mocker: MockerFixture) -> Generator[mock.MagicMock, None, None]:  # noqa: TID251
+def create_engine_spy(mocker: MockerFixture) -> Generator[mock.MagicMock, None, None]:  # noqa: TID251 # FIXME CoP
     spy = mocker.spy(sa, "create_engine")
     yield spy
     if not spy.call_count:
@@ -35,13 +41,13 @@ def create_engine_spy(mocker: MockerFixture) -> Generator[mock.MagicMock, None, 
 @pytest.fixture
 def gx_sqlalchemy_execution_engine_spy(
     mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
-) -> Generator[mock.MagicMock, None, None]:  # noqa: TID251
+) -> Generator[mock.MagicMock, None, None]:  # noqa: TID251 # FIXME CoP
     """
     Mock the SQLDatasource.execution_engine_type property to return a spy so that what would be passed to
     the GX SqlAlchemyExecutionEngine constructor can be inspected.
 
     NOTE: This is not exactly what gets passed to the sqlalchemy.engine.create_engine() function, but it is close.
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
     spy = mocker.Mock(spec=SqlAlchemyExecutionEngine)
     monkeypatch.setattr(SQLDatasource, "execution_engine_type", spy)
     yield spy
@@ -104,7 +110,7 @@ def create_engine_fake(monkeypatch: pytest.MonkeyPatch) -> None:
 class TestConfigPasstrough:
     def test_kwargs_passed_to_create_engine(
         self,
-        create_engine_spy: mock.MagicMock,  # noqa: TID251
+        create_engine_spy: mock.MagicMock,  # noqa: TID251 # FIXME CoP
         monkeypatch: pytest.MonkeyPatch,
         ephemeral_context_with_defaults: EphemeralDataContext,
         ds_kwargs: dict,
@@ -127,7 +133,7 @@ class TestConfigPasstrough:
 
     def test_ds_config_passed_to_gx_sqlalchemy_execution_engine(
         self,
-        gx_sqlalchemy_execution_engine_spy: mock.MagicMock,  # noqa: TID251
+        gx_sqlalchemy_execution_engine_spy: mock.MagicMock,  # noqa: TID251 # FIXME CoP
         monkeypatch: pytest.MonkeyPatch,
         ephemeral_context_with_defaults: EphemeralDataContext,
         ds_kwargs: dict,
@@ -167,7 +173,7 @@ def test_table_quoted_name_type_does_not_exist(
     DBMS entity names (table, column, etc.) must adhere to correct case insensitivity standards.  All upper case is
     standard for Oracle, DB2, and Snowflake, while all lowercase is standard for SQLAlchemy; hence, proper conversion to
     quoted names must occur.  This test ensures that mechanism for detection of non-existent table_nam" works correctly.
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
     table_names_in_dbms_schema: list[str] = [
         "table_name_0",
         "table_name_1",
@@ -197,7 +203,7 @@ def test_table_quoted_name_type_all_upper_case_normalizion_is_noop():
     DBMS entity names (table, column, etc.) must adhere to correct case insensitivity standards.  All upper case is
     standard for Oracle, DB2, and Snowflake, while all lowercase is standard for SQLAlchemy; hence, proper conversion to
     quoted names must occur.  This test ensures that all upper case entity usage does not undergo any conversion.
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
     table_names_in_dbms_schema: list[str] = [
         "ACTORS",
         "ARTISTS",
@@ -241,7 +247,7 @@ def test_table_quoted_name_type_all_lower_case_normalizion_full():
     DBMS entity names (table, column, etc.) must adhere to correct case insensitivity standards.  All upper case is
     standard for Oracle, DB2, and Snowflake, while all lowercase is standard for SQLAlchemy; hence, proper conversion to
     quoted names must occur.  This test ensures that all lower case entity usage undergo conversion to quoted literals.
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
     table_names_in_dbms_schema: list[str] = [
         "actors",
         "artists",
@@ -325,10 +331,78 @@ def test_specific_datasource_warnings(
             context.data_sources.add_sql(name="my_datasource", connection_string=connection_string)
     else:
         with warnings.catch_warnings():
-            warnings.simplefilter("error")  # should already be the default
             context.data_sources.add_sql(
                 name="my_datasource", connection_string=connection_string
             ).test_connection()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ["input_", "expected_output", "quote_characters"],
+    [
+        ("my_schema", "my_schema", DEFAULT_QUOTE_CHARACTERS),
+        ("MY_SCHEMA", "my_schema", DEFAULT_QUOTE_CHARACTERS),
+        ("My_Schema", "my_schema", DEFAULT_QUOTE_CHARACTERS),
+        ('"my_schema"', '"my_schema"', DEFAULT_QUOTE_CHARACTERS),
+        ('"MY_SCHEMA"', '"MY_SCHEMA"', DEFAULT_QUOTE_CHARACTERS),
+        ('"My_Schema"', '"My_Schema"', DEFAULT_QUOTE_CHARACTERS),
+        ("'my_schema'", "'my_schema'", DEFAULT_QUOTE_CHARACTERS),
+        ("'MY_SCHEMA'", "'MY_SCHEMA'", DEFAULT_QUOTE_CHARACTERS),
+        ("'My_Schema'", "'My_Schema'", DEFAULT_QUOTE_CHARACTERS),
+        (None, None, DEFAULT_QUOTE_CHARACTERS),
+        ("", "", DEFAULT_QUOTE_CHARACTERS),
+        ("`My_Schema`", "`My_Schema`", ("`",)),
+        ("'My_Schema'", "'my_schema'", ("`",)),
+    ],
+    ids=lambda x: str(x),
+)
+def test_to_lower_if_not_quoted(
+    input_: str | None, expected_output: str | None, quote_characters: tuple[str, ...]
+):
+    assert to_lower_if_not_quoted(input_, quote_characters=quote_characters) == expected_output
+
+
+@pytest.mark.unit
+class TestTableAsset:
+    @pytest.mark.parametrize("schema_name", ["my_schema", "MY_SCHEMA", "My_Schema"])
+    def test_unquoted_schema_names_are_added_as_lowercase(
+        self,
+        sql_datasource_table_asset_test_connection_noop: SQLDatasource,
+        schema_name: str,
+    ):
+        my_datasource: SQLDatasource = sql_datasource_table_asset_test_connection_noop
+
+        table_asset = my_datasource.add_table_asset(
+            name="my_table_asset",
+            table_name="my_table",
+            schema_name=schema_name,
+        )
+        assert table_asset.schema_name == schema_name.lower()
+
+    @pytest.mark.parametrize(
+        "schema_name",
+        [
+            '"my_schema"',
+            '"MY_SCHEMA"',
+            '"My_Schema"',
+            "'my_schema'",
+            "'MY_SCHEMA'",
+            "'My_Schema'",
+        ],
+    )
+    def test_quoted_schema_names_are_not_modified(
+        self,
+        sql_datasource_table_asset_test_connection_noop: SQLDatasource,
+        schema_name: str,
+    ):
+        my_datasource: SQLDatasource = sql_datasource_table_asset_test_connection_noop
+
+        table_asset = my_datasource.add_table_asset(
+            name="my_table_asset",
+            table_name="my_table",
+            schema_name=schema_name,
+        )
+        assert table_asset.schema_name == schema_name
 
 
 if __name__ == "__main__":

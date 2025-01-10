@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, Literal, Optional, Type, Union
 
+from great_expectations.compatibility import pydantic
 from great_expectations.expectations.expectation import (
     ColumnPairMapExpectation,
     render_suite_parameter_string,
 )
+from great_expectations.expectations.metadata_types import DataQualityIssues
 from great_expectations.expectations.model_field_descriptions import (
     COLUMN_A_DESCRIPTION,
     COLUMN_B_DESCRIPTION,
+    IGNORE_ROW_IF_DESCRIPTION,
     MOSTLY_DESCRIPTION,
 )
 from great_expectations.render import LegacyRendererType, RenderedStringTemplateContent
@@ -40,18 +43,18 @@ SUPPORTED_DATA_SOURCES = [
     "PostgreSQL",
     "MySQL",
     "MSSQL",
-    "Redshift",
     "BigQuery",
     "Snowflake",
+    "Databricks (SQL)",
 ]
-DATA_QUALITY_ISSUES = ["Distribution"]
+DATA_QUALITY_ISSUES = [DataQualityIssues.NUMERIC.value]
 
 
 class ExpectColumnPairValuesAToBeGreaterThanB(ColumnPairMapExpectation):
     __doc__ = f"""{EXPECTATION_SHORT_DESCRIPTION}
 
-    expect_column_pair_values_a_to_be_greater_than_b is a \
-    [Column Pair Map Expectation](https://docs.greatexpectations.io/docs/guides/expectations/creating_custom_expectations/how_to_create_custom_column_pair_map_expectations).
+    ExpectColumnPairValuesAToBeGreaterThanB is a \
+    Column Pair Map Expectation.
 
     Column Pair Map Expectations are evaluated for a pair of columns and ask a yes/no question about the row-wise relationship between those two columns.
     Based on the result, they then calculate the percentage of rows that gave a positive answer.
@@ -65,7 +68,7 @@ class ExpectColumnPairValuesAToBeGreaterThanB(ColumnPairMapExpectation):
     Other Parameters:
         ignore_row_if (str): \
             "both_values_are_missing", "either_value_is_missing", "neither" \
-            If specified, sets the condition on which a given row is to be ignored. Default "neither".
+            {IGNORE_ROW_IF_DESCRIPTION} Default "neither".
         mostly (None or a float between 0 and 1): \
             {MOSTLY_DESCRIPTION} \
             For more detail, see [mostly](https://docs.greatexpectations.io/docs/reference/expectations/standard_arguments/#mostly). Default 1.
@@ -84,7 +87,7 @@ class ExpectColumnPairValuesAToBeGreaterThanB(ColumnPairMapExpectation):
 
         Exact fields vary depending on the values passed to result_format, catch_exceptions, and meta.
 
-    Supported Datasources:
+    Supported Data Sources:
         [{SUPPORTED_DATA_SOURCES[0]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[1]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[2]}](https://docs.greatexpectations.io/docs/application_integration_support/)
@@ -95,7 +98,7 @@ class ExpectColumnPairValuesAToBeGreaterThanB(ColumnPairMapExpectation):
         [{SUPPORTED_DATA_SOURCES[7]}](https://docs.greatexpectations.io/docs/application_integration_support/)
 
 
-    Data Quality Category:
+    Data Quality Issues:
         {DATA_QUALITY_ISSUES[0]}
 
     Example Data:
@@ -174,11 +177,14 @@ class ExpectColumnPairValuesAToBeGreaterThanB(ColumnPairMapExpectation):
                   "meta": {{}},
                   "success": false
                 }}
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
-    or_equal: Union[bool, None] = None
+    or_equal: Union[bool, None] = pydantic.Field(default=None, description=OR_EQUAL_DESCRIPTION)
     ignore_row_if: Literal["both_values_are_missing", "either_value_is_missing", "neither"] = (
-        "both_values_are_missing"
+        pydantic.Field(
+            default="both_values_are_missing",
+            description=IGNORE_ROW_IF_DESCRIPTION,
+        )
     )
 
     # This dictionary contains metadata for display in the public gallery
@@ -210,6 +216,8 @@ class ExpectColumnPairValuesAToBeGreaterThanB(ColumnPairMapExpectation):
     )
 
     class Config:
+        title = "Expect column pair values A to be greater than B"
+
         @staticmethod
         def schema_extra(
             schema: Dict[str, Any], model: Type[ExpectColumnPairValuesAToBeGreaterThanB]
@@ -259,7 +267,7 @@ class ExpectColumnPairValuesAToBeGreaterThanB(ColumnPairMapExpectation):
         template_str = ""
 
         if not params.column_A or not params.column_B:
-            template_str += "$column has a bogus `expect_column_pair_values_A_to_be_greater_than_B` expectation. "  # noqa: E501
+            template_str += "$column has a bogus `expect_column_pair_values_A_to_be_greater_than_B` expectation. "  # noqa: E501 # FIXME CoP
 
         if not params.mostly or params.mostly.value == 1.0:
             if not params.or_equal:
@@ -267,15 +275,15 @@ class ExpectColumnPairValuesAToBeGreaterThanB(ColumnPairMapExpectation):
                     "Values in $column_A must always be greater than those in $column_B."
                 )
             else:
-                template_str += "Values in $column_A must always be greater than or equal to those in $column_B."  # noqa: E501
+                template_str += "Values in $column_A must always be greater than or equal to those in $column_B."  # noqa: E501 # FIXME CoP
         else:
             renderer_configuration = cls._add_mostly_pct_param(
                 renderer_configuration=renderer_configuration
             )
             if not params.or_equal:
-                template_str = "Values in $column_A must be greater than those in $column_B, at least $mostly_pct % of the time."  # noqa: E501
+                template_str = "Values in $column_A must be greater than those in $column_B, at least $mostly_pct % of the time."  # noqa: E501 # FIXME CoP
             else:
-                template_str = "Values in $column_A must be greater than or equal to those in $column_B, at least $mostly_pct % of the time."  # noqa: E501
+                template_str = "Values in $column_A must be greater than or equal to those in $column_B, at least $mostly_pct % of the time."  # noqa: E501 # FIXME CoP
 
         renderer_configuration.template_str = template_str
 
@@ -308,21 +316,21 @@ class ExpectColumnPairValuesAToBeGreaterThanB(ColumnPairMapExpectation):
         )
 
         if (params["column_A"] is None) or (params["column_B"] is None):
-            template_str = "$column has a bogus `expect_column_pair_values_A_to_be_greater_than_B` expectation."  # noqa: E501
+            template_str = "$column has a bogus `expect_column_pair_values_A_to_be_greater_than_B` expectation."  # noqa: E501 # FIXME CoP
             params["row_condition"] = None
 
         if params["mostly"] is None or params["mostly"] == 1.0:
             if params["or_equal"] in [None, False]:
                 template_str = "Values in $column_A must always be greater than those in $column_B."
             else:
-                template_str = "Values in $column_A must always be greater than or equal to those in $column_B."  # noqa: E501
+                template_str = "Values in $column_A must always be greater than or equal to those in $column_B."  # noqa: E501 # FIXME CoP
         else:
             params["mostly_pct"] = num_to_str(params["mostly"] * 100, no_scientific=True)
             # params["mostly_pct"] = "{:.14f}".format(params["mostly"]*100).rstrip("0").rstrip(".")
             if params["or_equal"] in [None, False]:
-                template_str = "Values in $column_A must be greater than those in $column_B, at least $mostly_pct % of the time."  # noqa: E501
+                template_str = "Values in $column_A must be greater than those in $column_B, at least $mostly_pct % of the time."  # noqa: E501 # FIXME CoP
             else:
-                template_str = "Values in $column_A must be greater than or equal to those in $column_B, at least $mostly_pct % of the time."  # noqa: E501
+                template_str = "Values in $column_A must be greater than or equal to those in $column_B, at least $mostly_pct % of the time."  # noqa: E501 # FIXME CoP
 
         if params["row_condition"] is not None:
             (

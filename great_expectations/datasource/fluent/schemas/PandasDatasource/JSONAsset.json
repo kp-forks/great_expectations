@@ -183,7 +183,6 @@
         },
         "PartitionerColumnValue": {
             "title": "PartitionerColumnValue",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "column_name": {
@@ -210,7 +209,6 @@
         },
         "PartitionerMultiColumnValue": {
             "title": "PartitionerMultiColumnValue",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "column_names": {
@@ -240,7 +238,6 @@
         },
         "PartitionerDividedInteger": {
             "title": "PartitionerDividedInteger",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "divisor": {
@@ -272,7 +269,6 @@
         },
         "PartitionerModInteger": {
             "title": "PartitionerModInteger",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "mod": {
@@ -304,7 +300,6 @@
         },
         "ColumnPartitionerYearly": {
             "title": "ColumnPartitionerYearly",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "column_name": {
@@ -331,7 +326,6 @@
         },
         "ColumnPartitionerMonthly": {
             "title": "ColumnPartitionerMonthly",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "column_name": {
@@ -358,7 +352,6 @@
         },
         "ColumnPartitionerDaily": {
             "title": "ColumnPartitionerDaily",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "column_name": {
@@ -385,7 +378,6 @@
         },
         "PartitionerDatetimePart": {
             "title": "PartitionerDatetimePart",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "datetime_parts": {
@@ -420,7 +412,6 @@
         },
         "PartitionerConvertedDatetime": {
             "title": "PartitionerConvertedDatetime",
-            "description": "--Public API--",
             "type": "object",
             "properties": {
                 "column_name": {
@@ -459,18 +450,27 @@
                     "type": "string",
                     "format": "regex"
                 },
-                "sort_ascending": {
-                    "title": "Sort Ascending",
-                    "default": true,
-                    "type": "boolean"
-                },
                 "param_names": {
                     "title": "Param Names",
                     "default": [
                         "year"
                     ],
                     "type": "array",
-                    "items": {}
+                    "minItems": 1,
+                    "maxItems": 1,
+                    "items": [
+                        {
+                            "enum": [
+                                "year"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                },
+                "sort_ascending": {
+                    "title": "Sort Ascending",
+                    "default": true,
+                    "type": "boolean"
                 }
             },
             "required": [
@@ -486,11 +486,6 @@
                     "type": "string",
                     "format": "regex"
                 },
-                "sort_ascending": {
-                    "title": "Sort Ascending",
-                    "default": true,
-                    "type": "boolean"
-                },
                 "param_names": {
                     "title": "Param Names",
                     "default": [
@@ -498,7 +493,27 @@
                         "month"
                     ],
                     "type": "array",
-                    "items": {}
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": [
+                        {
+                            "enum": [
+                                "year"
+                            ],
+                            "type": "string"
+                        },
+                        {
+                            "enum": [
+                                "month"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                },
+                "sort_ascending": {
+                    "title": "Sort Ascending",
+                    "default": true,
+                    "type": "boolean"
                 }
             },
             "required": [
@@ -514,11 +529,6 @@
                     "type": "string",
                     "format": "regex"
                 },
-                "sort_ascending": {
-                    "title": "Sort Ascending",
-                    "default": true,
-                    "type": "boolean"
-                },
                 "param_names": {
                     "title": "Param Names",
                     "default": [
@@ -527,7 +537,33 @@
                         "day"
                     ],
                     "type": "array",
-                    "items": {}
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "items": [
+                        {
+                            "enum": [
+                                "year"
+                            ],
+                            "type": "string"
+                        },
+                        {
+                            "enum": [
+                                "month"
+                            ],
+                            "type": "string"
+                        },
+                        {
+                            "enum": [
+                                "day"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                },
+                "sort_ascending": {
+                    "title": "Sort Ascending",
+                    "default": true,
+                    "type": "boolean"
                 }
             },
             "required": [
@@ -543,6 +579,13 @@
                     "type": "string",
                     "format": "regex"
                 },
+                "param_names": {
+                    "title": "Param Names",
+                    "default": [],
+                    "type": "array",
+                    "minItems": 0,
+                    "maxItems": 0
+                },
                 "sort_ascending": {
                     "title": "Sort Ascending",
                     "default": true,
@@ -555,7 +598,7 @@
         },
         "BatchDefinition": {
             "title": "BatchDefinition",
-            "description": "Configuration for a batch of data.\n\nReferences the DataAsset to be used, and any additional parameters needed to fetch the data.",
+            "description": "--Public API--Configuration for a batch of data.\n\nReferences the DataAsset to be used, and any additional parameters needed to fetch the data.",
             "type": "object",
             "properties": {
                 "id": {

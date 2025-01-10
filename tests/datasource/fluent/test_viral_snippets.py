@@ -15,13 +15,12 @@ from great_expectations.core.expectation_suite import ExpectationSuite
 from great_expectations.core.partitioners import ColumnPartitionerMonthly
 from great_expectations.core.yaml_handler import YAMLHandler
 from great_expectations.data_context import CloudDataContext, FileDataContext
+from great_expectations.datasource.fluent import SqliteDatasource
 from great_expectations.datasource.fluent.config import GxConfig
 from great_expectations.datasource.fluent.interfaces import Datasource
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
-
-    from great_expectations.datasource.fluent import SqliteDatasource
 
 
 YAML = YAMLHandler()
@@ -62,7 +61,7 @@ def test_serialize_fluent_config(
 
 @pytest.mark.filesystem
 def test_fluent_simple_validate_workflow(seeded_file_context: FileDataContext):
-    datasource = seeded_file_context.get_datasource("sqlite_taxi")
+    datasource = seeded_file_context.data_sources.get("sqlite_taxi")
     assert isinstance(datasource, Datasource)
     partitioner = ColumnPartitionerMonthly(column_name="pickup_datetime")
     batch_request = datasource.get_asset("my_asset").build_batch_request(
@@ -84,10 +83,10 @@ def test_save_project_does_not_break(seeded_file_context: FileDataContext):
 
 
 @pytest.mark.filesystem
-def test_variables_save_config_does_not_break(seeded_file_context: FileDataContext):
+def test_variables_save_does_not_break(seeded_file_context: FileDataContext):
     print(f"\tcontext.fluent_config ->\n{seeded_file_context.fluent_config}\n")
     print(f"\tcontext.variables ->\n{seeded_file_context.variables}")
-    seeded_file_context.variables.save_config()
+    seeded_file_context.variables.save()
 
 
 @pytest.mark.filesystem
@@ -156,7 +155,7 @@ def test_context_add_and_save_fluent_datasource(
         name=datasource_name, connection_string=f"sqlite:///{sqlite_database_path}"
     )
 
-    assert datasource_name in context.datasources
+    assert datasource_name in context.data_sources.all()
 
 
 # Test markers come from empty_contexts fixture
@@ -173,10 +172,11 @@ def test_context_add_or_update_datasource(
     assert datasource.connection_string == f"sqlite:///{sqlite_database_path}"
 
     # modify the datasource
-    datasource.connection_string = "sqlite:///"  # type: ignore[assignment]
+    datasource.connection_string = "sqlite:///"  # type: ignore[assignment] # FIXME CoP
     context.data_sources.add_or_update_sqlite(datasource)
 
-    updated_datasource: SqliteDatasource = context.datasources[datasource.name]  # type: ignore[assignment]
+    updated_datasource = context.data_sources.all()[datasource.name]
+    assert isinstance(updated_datasource, SqliteDatasource)
     assert updated_datasource.connection_string == "sqlite:///"
 
 
@@ -235,7 +235,7 @@ def test_quickstart_workflow(
 
     In particular, this test covers the file-backend and cloud-backed usecases with this script.
     The ephemeral usecase is covered in: tests/integration/docusaurus/tutorials/quickstart/quickstart.py
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
     # Slight deviation from the Quickstart here:
     #   1. Using existing contexts instead of `get_context`
     #   2. Using `read_csv` on a local file instead of making a network request

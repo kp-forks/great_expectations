@@ -8,13 +8,13 @@ import uuid
 from typing import Dict, List, Union
 
 import pytest
-from typing_extensions import override
 
 import great_expectations as gx
 import great_expectations.exceptions as gx_exceptions
 from great_expectations.core.expectation_suite import ExpectationSuite
 from great_expectations.core.yaml_handler import YAMLHandler
 from great_expectations.data_context import get_context
+from great_expectations.data_context.data_context.abstract_data_context import AbstractDataContext
 from great_expectations.data_context.data_context.cloud_data_context import CloudDataContext
 from great_expectations.data_context.data_context.ephemeral_data_context import (
     EphemeralDataContext,
@@ -56,18 +56,18 @@ def data_context_with_bad_datasource(tmp_path_factory):
     It is used by test_get_batch_multiple_datasources_do_not_scan_all()
     """
     project_path = str(tmp_path_factory.mktemp("data_context"))
-    context_path = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118
-    asset_config_path = os.path.join(context_path, "expectations")  # noqa: PTH118
+    context_path = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118 # FIXME CoP
+    asset_config_path = os.path.join(context_path, "expectations")  # noqa: PTH118 # FIXME CoP
     fixture_dir = file_relative_path(__file__, "../test_fixtures")
-    os.makedirs(  # noqa: PTH103
-        os.path.join(asset_config_path, "my_dag_node"),  # noqa: PTH118
+    os.makedirs(  # noqa: PTH103 # FIXME CoP
+        os.path.join(asset_config_path, "my_dag_node"),  # noqa: PTH118 # FIXME CoP
         exist_ok=True,
     )
     shutil.copy(
-        os.path.join(  # noqa: PTH118
+        os.path.join(  # noqa: PTH118 # FIXME CoP
             fixture_dir, "great_expectations_bad_datasource.yml"
         ),
-        str(os.path.join(context_path, FileDataContext.GX_YML)),  # noqa: PTH118
+        str(os.path.join(context_path, FileDataContext.GX_YML)),  # noqa: PTH118 # FIXME CoP
     )
     return get_context(context_root_dir=context_path)
 
@@ -106,10 +106,26 @@ def test_get_expectation_suite_include_rendered_content(
 
 @pytest.mark.unit
 def test_data_context_get_datasource_on_non_existent_one_raises_helpful_error(
-    titanic_data_context,
+    titanic_data_context: AbstractDataContext,
 ):
-    with pytest.raises(ValueError):
+    # this is deprecated
+    with pytest.warns(DeprecationWarning), pytest.raises(ValueError):
         _ = titanic_data_context.get_datasource("fakey_mc_fake")
+
+
+@pytest.mark.unit
+def test_data_context_get_datasource(
+    titanic_data_context: AbstractDataContext,
+):
+    # this is deprecated
+    name = "my datasource"
+    ds = titanic_data_context.data_sources.add_pandas(name)
+    with pytest.warns(DeprecationWarning) as warning_records:
+        fetched_ds = titanic_data_context.get_datasource(name)
+
+    assert fetched_ds == ds
+    assert len(warning_records) == 1
+    assert "context.get_datasource is deprecated" in str(warning_records.list[0].message)
 
 
 @pytest.mark.unit
@@ -158,7 +174,7 @@ def test__normalize_absolute_or_relative_path(tmp_path_factory, basic_data_conte
     )
 
     assert context._normalize_absolute_or_relative_path("yikes").endswith(
-        os.path.join(test_dir, "yikes")  # noqa: PTH118
+        os.path.join(test_dir, "yikes")  # noqa: PTH118 # FIXME CoP
     )
 
     assert test_dir not in context._normalize_absolute_or_relative_path("/yikes")
@@ -183,11 +199,11 @@ def test_load_data_context_from_environment_variables(tmp_path, monkeypatch):
     shutil.copy(
         file_relative_path(
             __file__,
-            os.path.join(  # noqa: PTH118
+            os.path.join(  # noqa: PTH118 # FIXME CoP
                 "..", "test_fixtures", "great_expectations_basic.yml"
             ),
         ),
-        str(os.path.join(context_path, FileDataContext.GX_YML)),  # noqa: PTH118
+        str(os.path.join(context_path, FileDataContext.GX_YML)),  # noqa: PTH118 # FIXME CoP
     )
     monkeypatch.setenv("GX_HOME", str(context_path))
     assert FileDataContext.find_context_root_dir() == str(context_path)
@@ -204,12 +220,12 @@ def test_data_context_create_does_not_raise_error_or_warning_if_ge_dir_exists(
 @pytest.fixture()
 def empty_context(tmp_path_factory) -> FileDataContext:
     project_path = str(tmp_path_factory.mktemp("data_context"))
-    ge_dir = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118
+    ge_dir = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118 # FIXME CoP
     context = get_context(context_root_dir=ge_dir)
     assert isinstance(context, FileDataContext)
-    assert os.path.isdir(ge_dir)  # noqa: PTH112
-    assert os.path.isfile(  # noqa: PTH113
-        os.path.join(ge_dir, FileDataContext.GX_YML)  # noqa: PTH118
+    assert os.path.isdir(ge_dir)  # noqa: PTH112 # FIXME CoP
+    assert os.path.isfile(  # noqa: PTH113 # FIXME CoP
+        os.path.join(ge_dir, FileDataContext.GX_YML)  # noqa: PTH118 # FIXME CoP
     )
     return context
 
@@ -232,12 +248,12 @@ def test_data_context_does_ge_yml_exist_returns_false_when_it_does_not_exist(
 ):
     ge_dir = empty_context.root_directory
     # mangle project
-    safe_remove(os.path.join(ge_dir, empty_context.GX_YML))  # noqa: PTH118
+    safe_remove(os.path.join(ge_dir, empty_context.GX_YML))  # noqa: PTH118 # FIXME CoP
     assert FileDataContext.does_config_exist_on_disk(ge_dir) is False
 
 
 @pytest.mark.filesystem
-def test_data_context_does_project_have_a_datasource_in_config_file_returns_true_when_it_has_a_datasource_configured_in_yml_file_on_disk(  # noqa: E501
+def test_data_context_does_project_have_a_datasource_in_config_file_returns_true_when_it_has_a_datasource_configured_in_yml_file_on_disk(  # noqa: E501 # FIXME CoP
     empty_context,
 ):
     ge_dir = empty_context.root_directory
@@ -246,7 +262,7 @@ def test_data_context_does_project_have_a_datasource_in_config_file_returns_true
 
 
 @pytest.mark.filesystem
-def test_data_context_does_project_have_a_datasource_in_config_file_returns_false_when_it_does_not_have_a_datasource_configured_in_yml_file_on_disk(  # noqa: E501
+def test_data_context_does_project_have_a_datasource_in_config_file_returns_false_when_it_does_not_have_a_datasource_configured_in_yml_file_on_disk(  # noqa: E501 # FIXME CoP
     empty_context,
 ):
     ge_dir = empty_context.root_directory
@@ -254,35 +270,35 @@ def test_data_context_does_project_have_a_datasource_in_config_file_returns_fals
 
 
 @pytest.mark.filesystem
-def test_data_context_does_project_have_a_datasource_in_config_file_returns_false_when_it_does_not_have_a_ge_yml_file(  # noqa: E501
+def test_data_context_does_project_have_a_datasource_in_config_file_returns_false_when_it_does_not_have_a_ge_yml_file(  # noqa: E501 # FIXME CoP
     empty_context,
 ):
     ge_dir = empty_context.root_directory
-    safe_remove(os.path.join(ge_dir, empty_context.GX_YML))  # noqa: PTH118
+    safe_remove(os.path.join(ge_dir, empty_context.GX_YML))  # noqa: PTH118 # FIXME CoP
     assert FileDataContext._does_project_have_a_datasource_in_config_file(ge_dir) is False
 
 
 @pytest.mark.filesystem
-def test_data_context_does_project_have_a_datasource_in_config_file_returns_false_when_it_does_not_have_a_ge_dir(  # noqa: E501
+def test_data_context_does_project_have_a_datasource_in_config_file_returns_false_when_it_does_not_have_a_ge_dir(  # noqa: E501 # FIXME CoP
     empty_context,
 ):
     ge_dir = empty_context.root_directory
-    safe_remove(os.path.join(ge_dir))  # noqa: PTH118
+    safe_remove(os.path.join(ge_dir))  # noqa: PTH118 # FIXME CoP
     assert FileDataContext._does_project_have_a_datasource_in_config_file(ge_dir) is False
 
 
 @pytest.mark.filesystem
-def test_data_context_does_project_have_a_datasource_in_config_file_returns_false_when_the_project_has_an_invalid_config_file(  # noqa: E501
+def test_data_context_does_project_have_a_datasource_in_config_file_returns_false_when_the_project_has_an_invalid_config_file(  # noqa: E501 # FIXME CoP
     empty_context,
 ):
     ge_dir = empty_context.root_directory
-    with open(os.path.join(ge_dir, FileDataContext.GX_YML), "w") as yml:  # noqa: PTH118
+    with open(os.path.join(ge_dir, FileDataContext.GX_YML), "w") as yml:  # noqa: PTH118 # FIXME CoP
         yml.write("this file: is not a valid ge config")
     assert FileDataContext._does_project_have_a_datasource_in_config_file(ge_dir) is False
 
 
 @pytest.mark.filesystem
-def test_data_context_is_project_initialized_returns_true_when_its_valid_context_has_one_datasource_and_one_suite(  # noqa: E501
+def test_data_context_is_project_initialized_returns_true_when_its_valid_context_has_one_datasource_and_one_suite(  # noqa: E501 # FIXME CoP
     empty_context,
 ):
     context = empty_context
@@ -295,7 +311,7 @@ def test_data_context_is_project_initialized_returns_true_when_its_valid_context
 
 
 @pytest.mark.filesystem
-def test_data_context_is_project_initialized_returns_true_when_its_valid_context_has_one_datasource_and_no_suites(  # noqa: E501
+def test_data_context_is_project_initialized_returns_true_when_its_valid_context_has_one_datasource_and_no_suites(  # noqa: E501 # FIXME CoP
     empty_context,
 ):
     context = empty_context
@@ -320,7 +336,7 @@ def test_data_context_is_project_initialized_returns_false_when_config_yml_is_mi
 ):
     ge_dir = empty_context.root_directory
     # mangle project
-    safe_remove(os.path.join(ge_dir, empty_context.GX_YML))  # noqa: PTH118
+    safe_remove(os.path.join(ge_dir, empty_context.GX_YML))  # noqa: PTH118 # FIXME CoP
 
     assert FileDataContext.is_project_initialized(ge_dir) is False
 
@@ -332,20 +348,20 @@ def test_data_context_is_project_initialized_returns_false_when_uncommitted_dir_
     ge_dir = empty_context.root_directory
     # mangle project
     shutil.rmtree(
-        os.path.join(ge_dir, empty_context.GX_UNCOMMITTED_DIR)  # noqa: PTH118
+        os.path.join(ge_dir, empty_context.GX_UNCOMMITTED_DIR)  # noqa: PTH118 # FIXME CoP
     )
 
     assert FileDataContext.is_project_initialized(ge_dir) is False
 
 
 @pytest.mark.filesystem
-def test_data_context_is_project_initialized_returns_false_when_uncommitted_data_docs_dir_is_missing(  # noqa: E501
+def test_data_context_is_project_initialized_returns_false_when_uncommitted_data_docs_dir_is_missing(  # noqa: E501 # FIXME CoP
     empty_context,
 ):
     ge_dir = empty_context.root_directory
     # mangle project
     shutil.rmtree(
-        os.path.join(  # noqa: PTH118
+        os.path.join(  # noqa: PTH118 # FIXME CoP
             ge_dir, empty_context.GX_UNCOMMITTED_DIR, "data_docs"
         )
     )
@@ -354,13 +370,13 @@ def test_data_context_is_project_initialized_returns_false_when_uncommitted_data
 
 
 @pytest.mark.filesystem
-def test_data_context_is_project_initialized_returns_false_when_uncommitted_validations_dir_is_missing(  # noqa: E501
+def test_data_context_is_project_initialized_returns_false_when_uncommitted_validations_dir_is_missing(  # noqa: E501 # FIXME CoP
     empty_context,
 ):
     ge_dir = empty_context.root_directory
     # mangle project
     shutil.rmtree(
-        os.path.join(  # noqa: PTH118
+        os.path.join(  # noqa: PTH118 # FIXME CoP
             ge_dir, empty_context.GX_UNCOMMITTED_DIR, "validations"
         )
     )
@@ -375,7 +391,7 @@ def test_data_context_is_project_initialized_returns_false_when_config_variable_
     ge_dir = empty_context.root_directory
     # mangle project
     safe_remove(
-        os.path.join(  # noqa: PTH118
+        os.path.join(  # noqa: PTH118 # FIXME CoP
             ge_dir, empty_context.GX_UNCOMMITTED_DIR, "config_variables.yml"
         )
     )
@@ -389,7 +405,7 @@ def test_data_context_create_raises_warning_and_leaves_existing_yml_untouched(
 ):
     project_path = str(tmp_path_factory.mktemp("data_context"))
     gx.get_context(mode="file", project_root_dir=project_path)
-    ge_yml = os.path.join(project_path, "gx/great_expectations.yml")  # noqa: PTH118
+    ge_yml = os.path.join(project_path, "gx/great_expectations.yml")  # noqa: PTH118 # FIXME CoP
     with open(ge_yml, "a") as ff:
         ff.write("# LOOK I WAS MODIFIED")
 
@@ -408,15 +424,15 @@ def test_data_context_create_makes_uncommitted_dirs_when_all_are_missing(
     gx.get_context(mode="file", project_root_dir=project_path)
 
     # mangle the existing setup
-    ge_dir = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118
-    uncommitted_dir = os.path.join(ge_dir, "uncommitted")  # noqa: PTH118
+    ge_dir = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118 # FIXME CoP
+    uncommitted_dir = os.path.join(ge_dir, "uncommitted")  # noqa: PTH118 # FIXME CoP
     shutil.rmtree(uncommitted_dir)
 
     # re-run create to simulate onboarding
     gx.get_context(mode="file", project_root_dir=project_path)
     obs = gen_directory_tree_str(ge_dir)
 
-    assert os.path.isdir(  # noqa: PTH112
+    assert os.path.isdir(  # noqa: PTH112 # FIXME CoP
         uncommitted_dir
     ), "No uncommitted directory created"
     assert (
@@ -469,7 +485,7 @@ gx/
     validation_definitions/
 """
     project_path = str(tmp_path_factory.mktemp("stuff"))
-    ge_dir = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118
+    ge_dir = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118 # FIXME CoP
 
     gx.get_context(mode="file", project_root_dir=project_path)
     fixture = gen_directory_tree_str(ge_dir)
@@ -493,8 +509,8 @@ uncommitted/
         .ge_store_backend_id
 """
     project_path = str(tmp_path_factory.mktemp("stuff"))
-    ge_dir = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118
-    uncommitted_dir = os.path.join(ge_dir, "uncommitted")  # noqa: PTH118
+    ge_dir = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118 # FIXME CoP
+    uncommitted_dir = os.path.join(ge_dir, "uncommitted")  # noqa: PTH118 # FIXME CoP
     gx.get_context(mode="file", project_root_dir=project_path)
     fixture = gen_directory_tree_str(uncommitted_dir)
     assert fixture == expected
@@ -503,8 +519,8 @@ uncommitted/
     assert FileDataContext.all_uncommitted_directories_exist(ge_dir)
 
     # remove a few
-    shutil.rmtree(os.path.join(uncommitted_dir, "data_docs"))  # noqa: PTH118
-    shutil.rmtree(os.path.join(uncommitted_dir, "validations"))  # noqa: PTH118
+    shutil.rmtree(os.path.join(uncommitted_dir, "data_docs"))  # noqa: PTH118 # FIXME CoP
+    shutil.rmtree(os.path.join(uncommitted_dir, "validations"))  # noqa: PTH118 # FIXME CoP
 
     # Test that not all exist
     assert not FileDataContext.all_uncommitted_directories_exist(project_path)
@@ -522,8 +538,8 @@ def test_data_context_create_builds_base_directories(tmp_path_factory):
         "checkpoints",
         "uncommitted",
     ]:
-        base_dir = os.path.join(project_path, context.GX_DIR, directory)  # noqa: PTH118
-        assert os.path.isdir(base_dir)  # noqa: PTH112
+        base_dir = os.path.join(project_path, context.GX_DIR, directory)  # noqa: PTH118 # FIXME CoP
+        assert os.path.isdir(base_dir)  # noqa: PTH112 # FIXME CoP
 
 
 @pytest.mark.filesystem
@@ -532,9 +548,9 @@ def test_data_context_create_does_not_overwrite_existing_config_variables_yml(
 ):
     project_path = str(tmp_path_factory.mktemp("data_context"))
     gx.get_context(mode="file", project_root_dir=project_path)
-    ge_dir = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118
-    uncommitted_dir = os.path.join(ge_dir, "uncommitted")  # noqa: PTH118
-    config_vars_yml = os.path.join(  # noqa: PTH118
+    ge_dir = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118 # FIXME CoP
+    uncommitted_dir = os.path.join(ge_dir, "uncommitted")  # noqa: PTH118 # FIXME CoP
+    config_vars_yml = os.path.join(  # noqa: PTH118 # FIXME CoP
         uncommitted_dir, "config_variables.yml"
     )
 
@@ -565,7 +581,7 @@ def test_scaffold_directories(tmp_path_factory):
         "validation_definitions",
     }
     assert set(
-        os.listdir(os.path.join(empty_directory, "uncommitted"))  # noqa: PTH118
+        os.listdir(os.path.join(empty_directory, "uncommitted"))  # noqa: PTH118 # FIXME CoP
     ) == {
         "data_docs",
         "validations",
@@ -576,17 +592,17 @@ def test_scaffold_directories(tmp_path_factory):
 def test_load_config_variables_property(basic_data_context_config, tmp_path_factory, monkeypatch):
     # Setup:
     base_path = str(tmp_path_factory.mktemp("test_load_config_variables_file"))
-    os.makedirs(  # noqa: PTH103
-        os.path.join(base_path, "uncommitted"),  # noqa: PTH118
+    os.makedirs(  # noqa: PTH103 # FIXME CoP
+        os.path.join(base_path, "uncommitted"),  # noqa: PTH118 # FIXME CoP
         exist_ok=True,
     )
     with open(
-        os.path.join(base_path, "uncommitted", "dev_variables.yml"),  # noqa: PTH118
+        os.path.join(base_path, "uncommitted", "dev_variables.yml"),  # noqa: PTH118 # FIXME CoP
         "w",
     ) as outfile:
         yaml.dump({"env": "dev"}, outfile)
     with open(
-        os.path.join(base_path, "uncommitted", "prod_variables.yml"),  # noqa: PTH118
+        os.path.join(base_path, "uncommitted", "prod_variables.yml"),  # noqa: PTH118 # FIXME CoP
         "w",
     ) as outfile:
         yaml.dump({"env": "prod"}, outfile)
@@ -604,8 +620,6 @@ def test_load_config_variables_property(basic_data_context_config, tmp_path_fact
         context = get_context(basic_data_context_config, context_root_dir=base_path)
         config_vars = context.config_variables
         assert config_vars["env"] == "prod"
-    except Exception:  # noqa: TRY302
-        raise
     finally:
         # Make sure we unset the environment variable we're using
         monkeypatch.delenv("TEST_CONFIG_FILE_ENV")
@@ -662,7 +676,7 @@ def test_modifications_to_config_vars_is_recognized_within_same_program_executio
     config_var_value: str = "my_patched_value"
 
     context.variables.config.plugins_directory = f"${config_var_name}"
-    context.save_config_variable(config_variable_name=config_var_name, value=config_var_value)
+    context.save_config_variable(name=config_var_name, value=config_var_value)
 
     assert context.plugins_directory and context.plugins_directory.endswith(config_var_value)
 
@@ -672,6 +686,8 @@ class ExpectSkyToBeColor(BatchExpectation):
     success_keys = ("color",)
     args_keys = ("color",)
 
+    color: str
+
     @classmethod
     @renderer(renderer_type=".".join([AtomicRendererType.PRESCRIPTIVE, "custom_renderer_type"]))
     def _prescriptive_renderer_custom(
@@ -680,8 +696,7 @@ class ExpectSkyToBeColor(BatchExpectation):
     ) -> None:
         raise ValueError("This renderer is broken!")
 
-    @override
-    def _validate(  # type: ignore[override]
+    def _validate(  # type: ignore[override,explicit-override] # FIXME
         self,
         **kwargs: dict,
     ) -> Dict[str, Union[bool, dict]]:
@@ -691,156 +706,107 @@ class ExpectSkyToBeColor(BatchExpectation):
         }
 
 
-@pytest.mark.xfail(
-    reason="Uses unsupported expectation but tests required behavior - fix this test as part of V1-117"  # noqa: E501
-)
-@pytest.mark.filesystem
-def test_unrendered_and_failed_prescriptive_renderer_behavior(
-    empty_data_context,
-):
-    context = empty_data_context
+class TestRenderedContent:
+    @pytest.mark.filesystem
+    def test_no_rendered_content_for_file_data_context(self, empty_data_context: FileDataContext):
+        suite_name = "test_suite"
+        empty_data_context.suites.add(
+            ExpectationSuite(
+                name=suite_name,
+                expectations=[gx.expectations.ExpectTableRowCountToEqual(value=0)],
+            )
+        )
+        expectation_suite = empty_data_context.suites.get(name=suite_name)
 
-    expectation_suite_name: str = "test_suite"
-
-    expectation_suite = ExpectationSuite(
-        expectation_suite_name=expectation_suite_name,
-        data_context=context,
-        expectations=[
-            ExpectationConfiguration(type="expect_table_row_count_to_equal", kwargs={"value": 0}),
-        ],
-    )
-    context.suites.add(expectation_suite)
-
-    # Without include_rendered_content set, all legacy rendered_content was None.
-    expectation_suite = context.suites.get(name=expectation_suite_name)
-    assert not any(
-        expectation_configuration.rendered_content
-        for expectation_configuration in expectation_suite.expectation_configurations
-    )
-
-    # Once we include_rendered_content, we get rendered_content on each ExpectationConfiguration in the ExpectationSuite.  # noqa: E501
-    expectation_suite = context.suites.get(name=expectation_suite_name)
-    for expectation_configuration in expectation_suite.expectation_configurations:
         assert all(
-            isinstance(rendered_content_block, RenderedAtomicContent)
-            for rendered_content_block in expectation_configuration.rendered_content
+            expectation.rendered_content is None for expectation in expectation_suite.expectations
         )
 
-    # If we change the ExpectationSuite to use an Expectation that has two content block renderers, one of which is  # noqa: E501
-    # broken, we should get the failure message for one of the content blocks.
-    expectation_suite = ExpectationSuite(
-        expectation_suite_name=expectation_suite_name,
-        data_context=context,
-        expectations=[
-            ExpectationConfiguration(type="expect_sky_to_be_color", kwargs={"color": "blue"}),
-        ],
-    )
-    context.suites.add(expectation_suite)
-    expectation_suite = context.suites.get(name=expectation_suite_name)
+    @pytest.mark.cloud
+    def test_rendered_content_for_cloud(self, empty_cloud_data_context: CloudDataContext) -> None:
+        suite_name = "test_suite"
+        empty_cloud_data_context.suites.add(
+            ExpectationSuite(
+                name=suite_name,
+                expectations=[gx.expectations.ExpectTableRowCountToEqual(value=0)],
+            )
+        )
+        expectation_suite = empty_cloud_data_context.suites.get(name=suite_name)
 
-    expected_rendered_content: List[RenderedAtomicContent] = [
-        RenderedAtomicContent(
-            name=AtomicPrescriptiveRendererType.FAILED,
-            value=renderedAtomicValueSchema.load(
-                {
-                    "template": "Rendering failed for Expectation: $expectation_type(**$kwargs).",
-                    "params": {
-                        "expectation_type": {
-                            "schema": {"type": "string"},
-                            "value": "expect_sky_to_be_color",
+        rendered_content_blocks: list = []
+        for expectation in expectation_suite.expectations:
+            assert expectation.rendered_content is not None
+            rendered_content_blocks.extend(expectation.rendered_content)
+        assert rendered_content_blocks
+
+    @pytest.mark.cloud
+    def test_multiple_rendered_content_blocks_one_is_busted(
+        self, empty_cloud_data_context: CloudDataContext
+    ) -> None:
+        suite_name = "test_suite"
+        empty_cloud_data_context.suites.add(
+            ExpectationSuite(
+                name=suite_name,
+                expectations=[
+                    ExpectSkyToBeColor(color="blue"),
+                ],
+            )
+        )
+        expectation_suite = empty_cloud_data_context.suites.get(name=suite_name)
+
+        expected_rendered_content: List[RenderedAtomicContent] = [
+            RenderedAtomicContent(
+                name=AtomicPrescriptiveRendererType.FAILED,
+                value=renderedAtomicValueSchema.load(
+                    {
+                        "template": (
+                            "Rendering failed for Expectation: $expectation_type(**$kwargs)."
+                        ),
+                        "params": {
+                            "expectation_type": {
+                                "schema": {"type": "string"},
+                                "value": "expect_sky_to_be_color",
+                            },
+                            "kwargs": {
+                                "schema": {"type": "string"},
+                                "value": {"color": "blue"},
+                            },
                         },
-                        "kwargs": {
-                            "schema": {"type": "string"},
-                            "value": {"color": "blue"},
-                        },
-                    },
-                    "schema": {"type": "com.superconductive.rendered.string"},
-                }
+                        "schema": {"type": "com.superconductive.rendered.string"},
+                    }
+                ),
+                value_type="StringValueType",
+                exception='Renderer "atomic.prescriptive.custom_renderer_type" failed to render Expectation '  # noqa: E501 # FIXME CoP
+                '"expect_sky_to_be_color with exception message: This renderer is broken!".',
             ),
-            value_type="StringValueType",
-            exception='Renderer "atomic.prescriptive.custom_renderer_type" failed to render Expectation '  # noqa: E501
-            '"expect_sky_to_be_color with exception message: This renderer is broken!".',
-        ),
-        RenderedAtomicContent(
-            name=AtomicPrescriptiveRendererType.SUMMARY,
-            value=renderedAtomicValueSchema.load(
-                {
-                    "schema": {"type": "com.superconductive.rendered.string"},
-                    "template": "$expectation_type(**$kwargs)",
-                    "params": {
-                        "expectation_type": {
-                            "schema": {"type": "string"},
-                            "value": "expect_sky_to_be_color",
+            RenderedAtomicContent(
+                name=AtomicPrescriptiveRendererType.SUMMARY,
+                value=renderedAtomicValueSchema.load(
+                    {
+                        "schema": {"type": "com.superconductive.rendered.string"},
+                        "template": "$expectation_type(**$kwargs)",
+                        "params": {
+                            "expectation_type": {
+                                "schema": {"type": "string"},
+                                "value": "expect_sky_to_be_color",
+                            },
+                            "kwargs": {
+                                "schema": {"type": "string"},
+                                "value": {"color": "blue"},
+                            },
                         },
-                        "kwargs": {
-                            "schema": {"type": "string"},
-                            "value": {"color": "blue"},
-                        },
-                    },
-                }
+                    }
+                ),
+                value_type="StringValueType",
             ),
-            value_type="StringValueType",
-        ),
-    ]
+        ]
 
-    actual_rendered_content: List[RenderedAtomicContent] = []
-    for expectation_configuration in expectation_suite.expectation_configurations:
-        actual_rendered_content.extend(expectation_configuration.rendered_content)
+        actual_rendered_content: List[RenderedAtomicContent] = []
+        for expectation in expectation_suite.expectations:
+            assert expectation.rendered_content is not None
+            actual_rendered_content.extend(expectation.rendered_content)
 
-    assert actual_rendered_content == expected_rendered_content
-
-    # If we have a legacy ExpectationSuite with successful rendered_content blocks, but the new renderer is broken,  # noqa: E501
-    # we should not update the existing rendered_content.
-    legacy_rendered_content = [
-        RenderedAtomicContent(
-            name=".".join([AtomicRendererType.PRESCRIPTIVE, "custom_renderer_type"]),
-            value=renderedAtomicValueSchema.load(
-                {
-                    "schema": {"type": "com.superconductive.rendered.string"},
-                    "template": "This is a working renderer for $expectation_type(**$kwargs).",
-                    "params": {
-                        "expectation_type": {
-                            "schema": {"type": "string"},
-                            "value": "expect_sky_to_be_color",
-                        },
-                        "kwargs": {
-                            "schema": {"type": "string"},
-                            "value": {"color": "blue"},
-                        },
-                    },
-                }
-            ),
-            value_type="StringValueType",
-        ),
-        RenderedAtomicContent(
-            name=AtomicPrescriptiveRendererType.SUMMARY,
-            value=renderedAtomicValueSchema.load(
-                {
-                    "schema": {"type": "com.superconductive.rendered.string"},
-                    "template": "$expectation_type(**$kwargs)",
-                    "params": {
-                        "expectation_type": {
-                            "schema": {"type": "string"},
-                            "value": "expect_sky_to_be_color",
-                        },
-                        "kwargs": {
-                            "schema": {"type": "string"},
-                            "value": {"color": "blue"},
-                        },
-                    },
-                }
-            ),
-            value_type="StringValueType",
-        ),
-    ]
-
-    expectation_suite.expectation_configurations[0].rendered_content = legacy_rendered_content
-
-    actual_rendered_content: List[RenderedAtomicContent] = []
-    for expectation_configuration in expectation_suite.expectation_configurations:
-        actual_rendered_content.extend(expectation_configuration.rendered_content)
-
-    assert actual_rendered_content == legacy_rendered_content
+        assert actual_rendered_content == expected_rendered_content
 
 
 @pytest.mark.filesystem

@@ -1,24 +1,28 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Type, Union
 
-from great_expectations.compatibility import pydantic
 from great_expectations.compatibility.typing_extensions import override
-from great_expectations.core.suite_parameters import (
-    SuiteParameterDict,  # noqa: TCH001  # type needed in pydantic validation
-)
 from great_expectations.expectations.expectation import (
     ColumnAggregateExpectation,
     render_suite_parameter_string,
 )
+from great_expectations.expectations.metadata_types import DataQualityIssues
 from great_expectations.expectations.model_field_descriptions import (
     COLUMN_DESCRIPTION,
     VALUE_SET_DESCRIPTION,
 )
 from great_expectations.expectations.model_field_types import (
-    ValueSet,  # noqa: TCH001  # type needed in pydantic validation
+    ValueSetField,  # noqa: TCH001  # type needed in pydantic validation
 )
-from great_expectations.render import LegacyRendererType, RenderedStringTemplateContent
+from great_expectations.render import (
+    AtomicDiagnosticRendererType,
+    LegacyRendererType,
+    RenderedAtomicContent,
+    RenderedStringTemplateContent,
+    renderedAtomicValueSchema,
+)
+from great_expectations.render.renderer.observed_value_renderer import ObservedValueRenderState
 from great_expectations.render.renderer.renderer import renderer
 from great_expectations.render.renderer_configuration import (
     RendererConfiguration,
@@ -47,18 +51,18 @@ SUPPORTED_DATA_SOURCES = [
     "PostgreSQL",
     "MySQL",
     "MSSQL",
-    "Redshift",
     "BigQuery",
     "Snowflake",
+    "Databricks (SQL)",
 ]
-DATA_QUALITY_ISSUES = ["Sets"]
+DATA_QUALITY_ISSUES = [DataQualityIssues.UNIQUENESS.value]
 
 
 class ExpectColumnDistinctValuesToContainSet(ColumnAggregateExpectation):
     __doc__ = f"""{EXPECTATION_SHORT_DESCRIPTION}
 
-    expect_column_distinct_values_to_contain_set is a \
-    [Column Aggregate Expectation](https://docs.greatexpectations.io/docs/guides/expectations/creating_custom_expectations/how_to_create_custom_column_aggregate_expectations).
+    ExpectColumnDistinctValuesToContainSet is a \
+    Column Aggregate Expectation.
 
     Column Aggregate Expectations are one of the most common types of Expectation.
     They are evaluated for a single column, and produce an aggregate Metric, such as a mean, standard deviation, number of unique values, column type, etc.
@@ -87,10 +91,10 @@ class ExpectColumnDistinctValuesToContainSet(ColumnAggregateExpectation):
         Exact fields vary depending on the values passed to result_format, catch_exceptions, and meta.
 
     See Also:
-        [expect_column_distinct_values_to_be_in_set](https://greatexpectations.io/expectations/expect_column_distinct_values_to_be_in_set)
-        [expect_column_distinct_values_to_equal_set](https://greatexpectations.io/expectations/expect_column_distinct_values_to_equal_set)
+        [ExpectColumnDistinctValuesToBeInSet](https://greatexpectations.io/expectations/expect_column_distinct_values_to_be_in_set)
+        [ExpectColumnDistinctValuesToEqualSet](https://greatexpectations.io/expectations/expect_column_distinct_values_to_equal_set)
 
-    Supported Datasources:
+    Supported Data Sources:
         [{SUPPORTED_DATA_SOURCES[0]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[1]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[2]}](https://docs.greatexpectations.io/docs/application_integration_support/)
@@ -101,7 +105,7 @@ class ExpectColumnDistinctValuesToContainSet(ColumnAggregateExpectation):
         [{SUPPORTED_DATA_SOURCES[7]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[8]}](https://docs.greatexpectations.io/docs/application_integration_support/)
 
-    Data Quality Category:
+    Data Quality Issues:
         {DATA_QUALITY_ISSUES[0]}
 
     Example Data:
@@ -182,14 +186,12 @@ class ExpectColumnDistinctValuesToContainSet(ColumnAggregateExpectation):
                 "meta": {{}},
                 "success": false
                 }}
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
-    value_set: Optional[Union[SuiteParameterDict, ValueSet]] = pydantic.Field(
-        description=VALUE_SET_DESCRIPTION,
-    )
+    value_set: ValueSetField
 
     # This dictionary contains metadata for display in the public gallery
-    library_metadata = {
+    library_metadata: ClassVar[Dict[str, Union[str, list, bool]]] = {
         "maturity": "production",
         "tags": ["core expectation", "column aggregate expectation"],
         "contributors": ["@great_expectations"],
@@ -200,7 +202,7 @@ class ExpectColumnDistinctValuesToContainSet(ColumnAggregateExpectation):
 
     _library_metadata = library_metadata
 
-    # Setting necessary computation metric dependencies and defining kwargs, as well as assigning kwargs default values\  # noqa: E501
+    # Setting necessary computation metric dependencies and defining kwargs, as well as assigning kwargs default values\  # noqa: E501 # FIXME CoP
     metric_dependencies = ("column.value_counts",)
     success_keys = ("value_set",)
 
@@ -210,6 +212,8 @@ class ExpectColumnDistinctValuesToContainSet(ColumnAggregateExpectation):
     )
 
     class Config:
+        title = "Expect column distinct values to contain set"
+
         @staticmethod
         def schema_extra(
             schema: Dict[str, Any], model: Type[ExpectColumnDistinctValuesToContainSet]
@@ -294,7 +298,7 @@ class ExpectColumnDistinctValuesToContainSet(ColumnAggregateExpectation):
             runtime_configuration=runtime_configuration,
         )
         if renderer_configuration.configuration is None:
-            raise ValueError("renderer_configuration.configuration is None.")  # noqa: TRY003
+            raise ValueError("renderer_configuration.configuration is None.")  # noqa: TRY003 # FIXME CoP
         params = substitute_none_for_missing(
             renderer_configuration.configuration.kwargs,
             [
@@ -352,7 +356,7 @@ class ExpectColumnDistinctValuesToContainSet(ColumnAggregateExpectation):
         parsed_value_set = value_set
 
         if observed_value_counts is None:
-            raise ValueError("observed_value_counts None, but is required")  # noqa: TRY003
+            raise ValueError("observed_value_counts None, but is required")  # noqa: TRY003 # FIXME CoP
         observed_value_set = set(observed_value_counts.index)
         expected_value_set = set(parsed_value_set)
 
@@ -363,3 +367,89 @@ class ExpectColumnDistinctValuesToContainSet(ColumnAggregateExpectation):
                 "details": {"value_counts": observed_value_counts},
             },
         }
+
+    @classmethod
+    @renderer(renderer_type=AtomicDiagnosticRendererType.OBSERVED_VALUE)
+    @override
+    def _atomic_diagnostic_observed_value(
+        cls,
+        configuration: Optional[ExpectationConfiguration] = None,
+        result: Optional[ExpectationValidationResult] = None,
+        runtime_configuration: Optional[dict] = None,
+    ) -> RenderedAtomicContent:
+        renderer_configuration: RendererConfiguration = RendererConfiguration(
+            configuration=configuration,
+            result=result,
+            runtime_configuration=runtime_configuration,
+        )
+        expected_param_prefix = "exp__"
+        expected_param_name = "expected_value"
+        ov_param_prefix = "ov__"
+        ov_param_name = "observed_value"
+
+        renderer_configuration.add_param(
+            name=expected_param_name,
+            param_type=RendererValueType.ARRAY,
+            value=renderer_configuration.kwargs.get("value_set", []),
+        )
+        renderer_configuration = cls._add_array_params(
+            array_param_name=expected_param_name,
+            param_prefix=expected_param_prefix,
+            renderer_configuration=renderer_configuration,
+        )
+
+        renderer_configuration.add_param(
+            name=ov_param_name,
+            param_type=RendererValueType.ARRAY,
+            value=result.get("result", {}).get("observed_value", []) if result else [],
+        )
+        renderer_configuration = cls._add_array_params(
+            array_param_name=ov_param_name,
+            param_prefix=ov_param_prefix,
+            renderer_configuration=renderer_configuration,
+        )
+
+        observed_value_set = set(
+            result.get("result", {}).get("observed_value", []) if result else []
+        )
+
+        observed_values = (
+            (name, sch)
+            for name, sch in renderer_configuration.params
+            if name.startswith(ov_param_prefix)
+        )
+        expected_values = (
+            (name, sch)
+            for name, sch in renderer_configuration.params
+            if name.startswith(expected_param_prefix)
+        )
+
+        template_str_list = []
+        for name, schema in observed_values:
+            renderer_configuration.params.__dict__[
+                name
+            ].render_state = ObservedValueRenderState.EXPECTED.value
+            template_str_list.append(f"${name}")
+
+        for name, schema in expected_values:
+            if schema.value not in observed_value_set:
+                renderer_configuration.params.__dict__[
+                    name
+                ].render_state = ObservedValueRenderState.MISSING.value
+                template_str_list.append(f"${name}")
+
+        renderer_configuration.template_str = " ".join(template_str_list)
+
+        value_obj = renderedAtomicValueSchema.load(
+            {
+                "template": renderer_configuration.template_str,
+                "params": renderer_configuration.params.dict(),
+                "meta_notes": renderer_configuration.meta_notes,
+                "schema": {"type": "com.superconductive.rendered.string"},
+            }
+        )
+        return RenderedAtomicContent(
+            name=AtomicDiagnosticRendererType.OBSERVED_VALUE,
+            value=value_obj,
+            value_type="StringValueType",
+        )

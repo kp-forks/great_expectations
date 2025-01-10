@@ -9,7 +9,7 @@ datasource = context.data_sources.add_pandas_gcs(
     name=datasource_name, bucket_or_name=bucket_or_name, gcs_options={}
 )
 
-assert datasource_name in context.datasources
+assert datasource_name in context.data_sources.all()
 
 asset_name = "my_taxi_data_asset"
 gcs_prefix = "data/taxi_yellow_tripdata_samples/"
@@ -23,8 +23,7 @@ batch_definition = data_asset.add_batch_definition_path(
 )
 
 my_batch_request = batch_definition.build_batch_request()
-batches = data_asset.get_batch_list_from_batch_request(my_batch_request)
-assert len(batches) == 1
-assert batches[0].metadata == {
+batches = data_asset.get_batch(my_batch_request)
+assert batches.metadata == {
     "path": "data/taxi_yellow_tripdata_samples/yellow_tripdata_sample_2019-02.csv"
 }
