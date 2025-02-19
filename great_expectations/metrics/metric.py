@@ -104,12 +104,13 @@ class Metric(BaseModel, metaclass=MetaMetric):
                 domain_class_name = str(base_type.__name__)
                 metric_class_name = str(cls.__name__)
                 domain_class_snake_case = Metric._pascal_to_snake(domain_class_name)
+                translated_domain_name = domain_class_snake_case.replace("batch", "table")
                 metric_class_snake_case = Metric._pascal_to_snake(metric_class_name)
                 # the convention is that the metric class name includes the domain class name
                 # but the metric names don't repeat the domain name, so we remove it
                 return ".".join(
                     [
-                        domain_class_snake_case,
+                        translated_domain_name,
                         metric_class_snake_case.replace(domain_class_snake_case, "").strip("_"),
                     ]
                 )
