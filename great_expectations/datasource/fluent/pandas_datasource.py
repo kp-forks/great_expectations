@@ -20,7 +20,6 @@ from typing import (
     Set,
     Tuple,
     Type,
-    TypeVar,
     Union,
 )
 
@@ -28,15 +27,16 @@ import pandas as pd
 
 import great_expectations.exceptions as gx_exceptions
 from great_expectations._docs_decorators import (
-    deprecated_argument,
-    new_argument,
     public_api,
 )
 from great_expectations.compatibility import pydantic, sqlalchemy
 from great_expectations.compatibility.sqlalchemy import sqlalchemy as sa
 from great_expectations.compatibility.typing_extensions import override
+from great_expectations.core.batch import LegacyBatchDefinition
 from great_expectations.core.batch_spec import PandasBatchSpec, RuntimeDataBatchSpec
+from great_expectations.core.id_dict import IDDict
 from great_expectations.datasource.fluent import BatchParameters, BatchRequest
+from great_expectations.datasource.fluent.batch_identifier_util import make_batch_identifier
 from great_expectations.datasource.fluent.constants import (
     _DATA_CONNECTOR_NAME,
     _FIELDS_ALWAYS_SET,
@@ -52,6 +52,7 @@ from great_expectations.datasource.fluent.interfaces import (
 )
 from great_expectations.datasource.fluent.signatures import _merge_signatures
 from great_expectations.datasource.fluent.sources import DEFAULT_PANDAS_DATA_ASSET_NAME
+from great_expectations.exceptions.exceptions import BuildBatchRequestError
 
 _EXCLUDE_TYPES_FROM_JSON: list[Type] = [sqlite3.Connection]
 
@@ -78,15 +79,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# this enables us to include dataframe in the json schema
-_PandasDataFrameT = TypeVar("_PandasDataFrameT")
-
-
 class PandasDatasourceError(Exception):
     pass
 
 
+@public_api
 class _PandasDataAsset(DataAsset):
+    """
+    A Pandas DataAsset is a DataAsset that is backed by a Pandas DataFrame.
+    """
+
     _EXCLUDE_FROM_READER_OPTIONS: ClassVar[Set[str]] = {
         "batch_definitions",
         "batch_metadata",
@@ -109,7 +111,7 @@ class _PandasDataAsset(DataAsset):
     def _get_reader_method(self) -> str:
         raise NotImplementedError(
             """One needs to explicitly provide "reader_method" for Pandas DataAsset extensions as temporary \
-work-around, until "type" naming convention and method for obtaining 'reader_method' from it are established."""  # noqa: E501
+work-around, until "type" naming convention and method for obtaining 'reader_method' from it are established."""  # noqa: E501 # FIXME CoP
         )
 
     @override
@@ -119,12 +121,17 @@ work-around, until "type" naming convention and method for obtaining 'reader_met
     def get_batch_parameters_keys(
         self, partitioner: Optional[ColumnPartitioner] = None
     ) -> Tuple[str, ...]:
-        return tuple()
+        return tuple(
+            "dataframe",
+        )
 
     @override
-    def get_batch_list_from_batch_request(self, batch_request: BatchRequest) -> list[Batch]:
+    def get_batch_identifiers_list(self, batch_request: BatchRequest) -> List[dict]:
+        return [IDDict(batch_request.options)]
+
+    @override
+    def get_batch(self, batch_request: BatchRequest) -> Batch:
         self._validate_batch_request(batch_request)
-        batch_list: List[Batch] = []
 
         batch_spec = PandasBatchSpec(
             reader_method=self._get_reader_method(),
@@ -141,35 +148,28 @@ work-around, until "type" naming convention and method for obtaining 'reader_met
         # batch_definition (along with batch_spec and markers) is only here to satisfy a
         # legacy constraint when computing usage statistics in a validator. We hope to remove
         # it in the future.
-        # imports are done inline to prevent a circular dependency with core/batch.py
-        from great_expectations.core import IDDict
-        from great_expectations.core.batch import LegacyBatchDefinition
-
         batch_definition = LegacyBatchDefinition(
             datasource_name=self.datasource.name,
             data_connector_name=_DATA_CONNECTOR_NAME,
             data_asset_name=self.name,
-            batch_identifiers=IDDict(batch_request.options),
+            batch_identifiers=make_batch_identifier(batch_request.options),
             batch_spec_passthrough=None,
         )
 
         batch_metadata: BatchMetadata = self._get_batch_metadata_from_batch_request(
-            batch_request=batch_request
+            batch_request=batch_request, ignore_options=("dataframe",)
         )
 
-        batch_list.append(
-            Batch(
-                datasource=self.datasource,
-                data_asset=self,
-                batch_request=batch_request,
-                data=data,
-                metadata=batch_metadata,
-                batch_markers=markers,
-                batch_spec=batch_spec,
-                batch_definition=batch_definition,
-            )
+        return Batch(
+            datasource=self.datasource,
+            data_asset=self,
+            batch_request=batch_request,
+            data=data,
+            metadata=batch_metadata,
+            batch_markers=markers,
+            batch_spec=batch_spec,
+            batch_definition=batch_definition,
         )
-        return batch_list
 
     @override
     def build_batch_request(
@@ -186,22 +186,25 @@ work-around, until "type" naming convention and method for obtaining 'reader_met
             partitioner: This is not currently supported and must be None for this data asset.
 
         Returns:
-            A BatchRequest object that can be used to obtain a batch list from a Datasource by calling the
-            get_batch_list_from_batch_request method.
-        """  # noqa: E501
+            A BatchRequest object that can be used to obtain a batch from an Asset by calling the
+            get_batch method.
+        """
         if options:
-            raise ValueError(  # noqa: TRY003
-                "options is not currently supported for this DataAssets and must be None or {}."
+            raise BuildBatchRequestError(
+                message="options is not currently supported for this DataAsset "
+                "and must be None or {}."
             )
 
         if batch_slice is not None:
-            raise ValueError(  # noqa: TRY003
-                "batch_slice is not currently supported and must be None for this DataAsset."
+            raise BuildBatchRequestError(
+                message="batch_slice is not currently supported for this DataAsset "
+                "and must be None."
             )
 
         if partitioner is not None:
-            raise ValueError(  # noqa: TRY003
-                "partitioner is not currently supported and must be None for this DataAsset."
+            raise BuildBatchRequestError(
+                message="partitioner is not currently supported for this DataAsset "
+                "and must be None."
             )
 
         return BatchRequest(
@@ -212,6 +215,15 @@ work-around, until "type" naming convention and method for obtaining 'reader_met
 
     @public_api
     def add_batch_definition_whole_dataframe(self, name: str) -> BatchDefinition:
+        """
+        Add a BatchDefinition that requests the whole dataframe.
+
+        Args:
+            name: The name of the BatchDefinition.
+
+        Returns:
+            A BatchDefinition with no partitioning.
+        """
         return self.add_batch_definition(
             name=name,
             partitioner=None,
@@ -235,14 +247,14 @@ work-around, until "type" naming convention and method for obtaining 'reader_met
                 options={},
                 batch_slice=batch_request._batch_slice_input,
             )
-            raise gx_exceptions.InvalidBatchRequestError(  # noqa: TRY003
+            raise gx_exceptions.InvalidBatchRequestError(  # noqa: TRY003 # FIXME CoP
                 "BatchRequest should have form:\n"
                 f"{pf(expect_batch_request_form.dict())}\n"
                 f"but actually has form:\n{pf(batch_request.dict())}\n"
             )
 
     @override
-    def json(  # noqa: PLR0913
+    def json(  # noqa: PLR0913 # FIXME CoP
         self,
         *,
         include: AbstractSetIntStr | MappingIntStrAny | None = None,
@@ -356,42 +368,27 @@ def _short_id() -> str:
     return str(uuid.uuid4()).replace("-", "")[:11]
 
 
-class DataFrameAsset(_PandasDataAsset, Generic[_PandasDataFrameT]):
+class DataFrameAsset(_PandasDataAsset):
     # instance attributes
     type: Literal["dataframe"] = "dataframe"
-    # TODO: <Alex>05/31/2023: Upon removal of deprecated "dataframe" argument to "PandasDatasource.add_dataframe_asset()", default can be deleted.</Alex>  # noqa: E501
-    dataframe: Optional[_PandasDataFrameT] = pydantic.Field(default=None, exclude=True, repr=False)
 
     class Config:
         extra = pydantic.Extra.forbid
 
-    @pydantic.validator("dataframe")
-    def _validate_dataframe(cls, dataframe: pd.DataFrame) -> pd.DataFrame:
-        if not isinstance(dataframe, pd.DataFrame):
-            raise ValueError("dataframe must be of type pandas.DataFrame")  # noqa: TRY003, TRY004
-        return dataframe
-
     @override
     def _get_reader_method(self) -> str:
         raise NotImplementedError(
-            """Pandas DataFrameAsset does not implement "_get_reader_method()" method, because DataFrame is already available."""  # noqa: E501
+            """Pandas DataFrameAsset does not implement "_get_reader_method()" method, because DataFrame is already available."""  # noqa: E501 # FIXME CoP
         )
 
     def _get_reader_options_include(self) -> set[str]:
         raise NotImplementedError(
-            """Pandas DataFrameAsset does not implement "_get_reader_options_include()" method, because DataFrame is already available."""  # noqa: E501
+            """Pandas DataFrameAsset does not implement "_get_reader_options_include()" method, because DataFrame is already available."""  # noqa: E501 # FIXME CoP
         )
 
-    # TODO: <Alex>05/31/2023: Upon removal of deprecated "dataframe" argument to "PandasDatasource.add_dataframe_asset()", its validation code must be deleted.</Alex>  # noqa: E501
-    @new_argument(
-        argument_name="dataframe",
-        message='The "dataframe" argument is no longer part of "PandasDatasource.add_dataframe_asset()" method call; instead, "dataframe" is the required argument to "DataFrameAsset.build_batch_request()" method.',  # noqa: E501
-        version="0.16.15",
-    )
     @override
-    def build_batch_request(  # type: ignore[override]
+    def build_batch_request(
         self,
-        dataframe: Optional[pd.DataFrame] = None,
         options: Optional[BatchParameters] = None,
         batch_slice: Optional[BatchSlice] = None,
         partitioner: Optional[ColumnPartitioner] = None,
@@ -399,81 +396,104 @@ class DataFrameAsset(_PandasDataAsset, Generic[_PandasDataFrameT]):
         """A batch request that can be used to obtain batches for this DataAsset.
 
         Args:
-            dataframe: The Pandas Dataframe containing the data for this DataFrame data asset.
-            options: This is not currently supported and must be {}/None for this data asset.
+            options: This should have 1 key, 'dataframe', whose value is the datafame to validate.
             batch_slice: This is not currently supported and must be None for this data asset.
             partitioner: This is not currently supported and must be None for this data asset.
 
         Returns:
-            A BatchRequest object that can be used to obtain a batch list from a Datasource by calling the
-            get_batch_list_from_batch_request method.
-        """  # noqa: E501
-        if options:
-            raise ValueError(  # noqa: TRY003
-                "options is not currently supported for this DataAssets and must be None or {}."
-            )
-
+            A BatchRequest object that can be used to obtain a batch from an Asset by calling the
+            get_batch method.
+        """
         if batch_slice is not None:
-            raise ValueError(  # noqa: TRY003
-                "batch_slice is not currently supported and must be None for this DataAsset."
+            raise BuildBatchRequestError(
+                message="batch_slice is not currently supported for this DataAsset "
+                "and must be None."
             )
 
         if partitioner is not None:
-            raise ValueError(  # noqa: TRY003
-                "partitioner is not currently supported and must be None for this DataAsset."
+            raise BuildBatchRequestError(
+                message="partitioner is not currently supported  for this DataAsset"
+                "and must be None."
             )
 
-        if dataframe is None:
-            df = self.dataframe
-        else:
-            df = dataframe  # type: ignore[assignment]
+        if not (options is not None and "dataframe" in options and len(options) == 1):
+            raise BuildBatchRequestError(message="options must contain exactly 1 key, 'dataframe'.")
 
-        if df is None:
-            raise ValueError("Cannot build batch request for dataframe asset without a dataframe")  # noqa: TRY003
+        if not isinstance(options["dataframe"], pd.DataFrame):
+            raise BuildBatchRequestError(
+                message="Cannot build batch request for dataframe asset without a dataframe"
+            )
 
-        self.dataframe = df
-
-        return super().build_batch_request()
+        return BatchRequest(
+            datasource_name=self.datasource.name,
+            data_asset_name=self.name,
+            options=options,
+        )
 
     @override
-    def get_batch_list_from_batch_request(self, batch_request: BatchRequest) -> list[Batch]:
+    def _validate_batch_request(self, batch_request: BatchRequest) -> None:
+        """Validates the batch_request has the correct form.
+
+        Args:
+            batch_request: A batch request object to be validated.
+        """
+        if not (
+            batch_request.datasource_name == self.datasource.name
+            and batch_request.data_asset_name == self.name
+            and batch_request.options
+            and len(batch_request.options) == 1
+            and "dataframe" in batch_request.options
+            and isinstance(batch_request.options["dataframe"], pd.DataFrame)
+        ):
+            expect_batch_request_form = BatchRequest[None](
+                datasource_name=self.datasource.name,
+                data_asset_name=self.name,
+                options={"dataframe": pd.DataFrame()},
+                batch_slice=batch_request._batch_slice_input,
+            )
+            raise gx_exceptions.InvalidBatchRequestError(  # noqa: TRY003 # FIXME CoP
+                "BatchRequest should have form:\n"
+                f"{pf(expect_batch_request_form.dict())}\n"
+                f"but actually has form:\n{pf(batch_request.dict())}\n"
+            )
+
+    @override
+    def get_batch_identifiers_list(self, batch_request: BatchRequest) -> List[dict]:
+        return [IDDict(batch_request.options)]
+
+    @override
+    def get_batch(self, batch_request: BatchRequest) -> Batch:
         self._validate_batch_request(batch_request)
 
-        batch_spec = RuntimeDataBatchSpec(batch_data=self.dataframe)
+        batch_spec = RuntimeDataBatchSpec(batch_data=batch_request.options["dataframe"])
         execution_engine: PandasExecutionEngine = self.datasource.get_execution_engine()
         data, markers = execution_engine.get_batch_data_and_markers(batch_spec=batch_spec)
 
         # batch_definition (along with batch_spec and markers) is only here to satisfy a
         # legacy constraint when computing usage statistics in a validator. We hope to remove
         # it in the future.
-        # imports are done inline to prevent a circular dependency with core/batch.py
-        from great_expectations.core import IDDict
-        from great_expectations.core.batch import LegacyBatchDefinition
-
         batch_definition = LegacyBatchDefinition(
             datasource_name=self.datasource.name,
             data_connector_name=_DATA_CONNECTOR_NAME,
             data_asset_name=self.name,
-            batch_identifiers=IDDict(batch_request.options),
+            batch_identifiers=make_batch_identifier(batch_request.options),
             batch_spec_passthrough=None,
         )
 
         batch_metadata: BatchMetadata = self._get_batch_metadata_from_batch_request(
-            batch_request=batch_request
+            batch_request=batch_request, ignore_options=("dataframe",)
         )
 
-        return [
-            Batch(
-                datasource=self.datasource,
-                data_asset=self,
-                batch_request=batch_request,
-                data=data,
-                metadata=batch_metadata,
-                batch_markers=markers,
-                batch_spec=batch_spec,
-                batch_definition=batch_definition,
-            )
-        ]
+        return Batch(
+            datasource=self.datasource,
+            data_asset=self,
+            batch_request=batch_request,
+            data=data,
+            metadata=batch_metadata,
+            batch_markers=markers,
+            batch_spec=batch_spec,
+            batch_definition=batch_definition,
+        )
 
 
 class _PandasDatasource(Datasource, Generic[_DataAssetT]):
@@ -512,7 +532,7 @@ class _PandasDatasource(Datasource, Generic[_DataAssetT]):
     # End Abstract Methods
 
     @override
-    def json(  # noqa: PLR0913
+    def json(  # noqa: PLR0913 # FIXME CoP
         self,
         *,
         include: AbstractSetIntStr | MappingIntStrAny | None = None,
@@ -573,7 +593,7 @@ class _PandasDatasource(Datasource, Generic[_DataAssetT]):
 
         Args:
             asset: The DataAsset to be added to this datasource.
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         asset_name: str = asset.name
 
         asset_names: Set[str] = self.get_asset_names()
@@ -584,14 +604,14 @@ class _PandasDatasource(Datasource, Generic[_DataAssetT]):
 
         if asset_name == DEFAULT_PANDAS_DATA_ASSET_NAME:
             if in_cloud_context:
-                # In cloud mode, we need to generate a unique name for the asset so that it gets persisted  # noqa: E501
+                # In cloud mode, we need to generate a unique name for the asset so that it gets persisted  # noqa: E501 # FIXME CoP
                 asset_name = f"{asset.type}-{_short_id()}"
                 logger.info(
-                    f"Generating unique name for '{DEFAULT_PANDAS_DATA_ASSET_NAME}' asset '{asset_name}'"  # noqa: E501
+                    f"Generating unique name for '{DEFAULT_PANDAS_DATA_ASSET_NAME}' asset '{asset_name}'"  # noqa: E501 # FIXME CoP
                 )
                 asset.name = asset_name
             elif asset_name in asset_names:
-                self.delete_asset(asset_name=asset_name)
+                self.delete_asset(name=asset_name)
 
         return super()._add_asset(asset=asset, connect_options=connect_options)
 
@@ -609,6 +629,9 @@ class PandasDatasource(_PandasDatasource):
             are Pandas DataAsset objects.
     """
 
+    # class directive to automatically generate read_* methods for assets
+    ADD_READER_METHODS: ClassVar[bool] = True
+
     # class attributes
     asset_types: ClassVar[Sequence[Type[DataAsset]]] = _DYNAMIC_ASSET_TYPES + [DataFrameAsset]
 
@@ -618,8 +641,8 @@ class PandasDatasource(_PandasDatasource):
 
     @override
     def dict(self, _exclude_default_asset_names: bool = True, **kwargs):
-        """Overriding `.dict()` so that `DEFAULT_PANDAS_DATA_ASSET_NAME` is always excluded on serialization."""  # noqa: E501
-        # Overriding `.dict()` instead of `.json()` because `.json()`is only called from the outermost model,  # noqa: E501
+        """Overriding `.dict()` so that `DEFAULT_PANDAS_DATA_ASSET_NAME` is always excluded on serialization."""  # noqa: E501 # FIXME CoP
+        # Overriding `.dict()` instead of `.json()` because `.json()`is only called from the outermost model,  # noqa: E501 # FIXME CoP
         # .dict() is called for deeply nested models.
         ds_dict = super().dict(**kwargs)
         if _exclude_default_asset_names:
@@ -636,8 +659,8 @@ class PandasDatasource(_PandasDatasource):
     @staticmethod
     def _validate_asset_name(asset_name: Optional[str] = None) -> str:
         if asset_name == DEFAULT_PANDAS_DATA_ASSET_NAME:
-            raise PandasDatasourceError(  # noqa: TRY003
-                f"""An asset_name of {DEFAULT_PANDAS_DATA_ASSET_NAME} cannot be passed because it is a reserved name."""  # noqa: E501
+            raise PandasDatasourceError(  # noqa: TRY003 # FIXME CoP
+                f"""An asset_name of {DEFAULT_PANDAS_DATA_ASSET_NAME} cannot be passed because it is a reserved name."""  # noqa: E501 # FIXME CoP
             )
         if not asset_name:
             asset_name = DEFAULT_PANDAS_DATA_ASSET_NAME
@@ -647,44 +670,36 @@ class PandasDatasource(_PandasDatasource):
         batch_request: BatchRequest
         if isinstance(asset, DataFrameAsset):
             if not isinstance(dataframe, pd.DataFrame):
-                raise ValueError(  # noqa: TRY003, TRY004
-                    'Cannot execute "PandasDatasource.read_dataframe()" without a valid "dataframe" argument.'  # noqa: E501
+                raise ValueError(  # noqa: TRY003, TRY004 # FIXME CoP
+                    'Cannot execute "PandasDatasource.read_dataframe()" without a valid "dataframe" argument.'  # noqa: E501 # FIXME CoP
                 )
 
-            batch_request = asset.build_batch_request(dataframe=dataframe)
+            batch_request = asset.build_batch_request(options={"dataframe": dataframe})
         else:
             batch_request = asset.build_batch_request()
 
-        return asset.get_batch_list_from_batch_request(batch_request)[-1]
+        return asset.get_batch(batch_request)
 
     @public_api
-    @deprecated_argument(
-        argument_name="dataframe",
-        message='The "dataframe" argument is no longer part of "PandasDatasource.add_dataframe_asset()" method call; instead, "dataframe" is the required argument to "DataFrameAsset.build_batch_request()" method.',  # noqa: E501
-        version="0.16.15",
-    )
     def add_dataframe_asset(
         self,
         name: str,
-        dataframe: Optional[pd.DataFrame] = None,
         batch_metadata: Optional[BatchMetadata] = None,
     ) -> DataFrameAsset:
         """Adds a Dataframe DataAsset to this PandasDatasource object.
 
         Args:
             name: The name of the Dataframe asset. This can be any arbitrary string.
-            dataframe: The Pandas Dataframe containing the data for this DataFrame data asset.
             batch_metadata: An arbitrary user defined dictionary with string keys which will get inherited by any
                             batches created from the asset.
 
         Returns:
-            The DataFameAsset that has been added to this datasource.
-        """  # noqa: E501
+            The DataFrameAsset that has been added to this datasource.
+        """  # noqa: E501 # FIXME CoP
         asset: DataFrameAsset = DataFrameAsset(
             name=name,
             batch_metadata=batch_metadata or {},
         )
-        asset.dataframe = dataframe
         return self._add_asset(asset=asset)
 
     @public_api
@@ -704,7 +719,7 @@ class PandasDatasource(_PandasDatasource):
 
         Returns:
             A Batch using an ephemeral DataFrameAsset.
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         name: str = self._validate_asset_name(asset_name=asset_name)
         asset: DataFrameAsset = self.add_dataframe_asset(
             name=name,
@@ -717,7 +732,7 @@ class PandasDatasource(_PandasDatasource):
         self,
         name: str,
         **kwargs,
-    ) -> ClipboardAsset:  # type: ignore[valid-type]
+    ) -> ClipboardAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add a clipboard data asset to the datasource.
 
@@ -751,7 +766,7 @@ class PandasDatasource(_PandasDatasource):
             A Batch using an ephemeral ClipboardAsset.
         """
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: ClipboardAsset = self.add_clipboard_asset(  # type: ignore[valid-type]
+        asset: ClipboardAsset = self.add_clipboard_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             **kwargs,
         )
@@ -763,7 +778,7 @@ class PandasDatasource(_PandasDatasource):
         name: str,
         filepath_or_buffer: pydantic.FilePath | pydantic.AnyUrl,
         **kwargs,
-    ) -> CSVAsset:  # type: ignore[valid-type]
+    ) -> CSVAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add a CSV data asset to the datasource.
 
@@ -777,7 +792,7 @@ class PandasDatasource(_PandasDatasource):
         """
         asset = CSVAsset(
             name=name,
-            filepath_or_buffer=filepath_or_buffer,  # type: ignore[call-arg]
+            filepath_or_buffer=filepath_or_buffer,  # type: ignore[call-arg] # FIXME CoP
             **kwargs,
         )
         return self._add_asset(asset=asset)
@@ -801,7 +816,7 @@ class PandasDatasource(_PandasDatasource):
             A Batch using an ephemeral CSVAsset.
         """
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: CSVAsset = self.add_csv_asset(  # type: ignore[valid-type]
+        asset: CSVAsset = self.add_csv_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             filepath_or_buffer=filepath_or_buffer,
             **kwargs,
@@ -814,7 +829,7 @@ class PandasDatasource(_PandasDatasource):
         name: str,
         io: os.PathLike | str | bytes,
         **kwargs,
-    ) -> ExcelAsset:  # type: ignore[valid-type]
+    ) -> ExcelAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add an Excel data asset to the datasource.
 
@@ -826,7 +841,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The ExcelAsset that has been added to this datasource.
         """
-        asset = ExcelAsset(  # type: ignore[call-arg]
+        asset = ExcelAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             io=io,
             **kwargs,
@@ -852,7 +867,7 @@ class PandasDatasource(_PandasDatasource):
             A Batch using an ephemeral ExcelAsset.
         """
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: ExcelAsset = self.add_excel_asset(  # type: ignore[valid-type]
+        asset: ExcelAsset = self.add_excel_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             io=io,
             **kwargs,
@@ -865,7 +880,7 @@ class PandasDatasource(_PandasDatasource):
         name: str,
         path: pydantic.FilePath | pydantic.AnyUrl,
         **kwargs,
-    ) -> FeatherAsset:  # type: ignore[valid-type]
+    ) -> FeatherAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add a Feather data asset to the datasource.
 
@@ -877,7 +892,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The FeatherAsset that has been added to this datasource.
         """
-        asset = FeatherAsset(  # type: ignore[call-arg]
+        asset = FeatherAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             path=path,
             **kwargs,
@@ -903,7 +918,7 @@ class PandasDatasource(_PandasDatasource):
             A Batch using an ephemeral FeatherAsset.
         """
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: FeatherAsset = self.add_feather_asset(  # type: ignore[valid-type]
+        asset: FeatherAsset = self.add_feather_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             path=path,
             **kwargs,
@@ -916,7 +931,7 @@ class PandasDatasource(_PandasDatasource):
         name: str,
         filepath_or_buffer: pydantic.FilePath | pydantic.AnyUrl,
         **kwargs,
-    ) -> FeatherAsset:  # type: ignore[valid-type]
+    ) -> FeatherAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Adds a Fixed Width File DataAsset to the datasource.
 
@@ -928,7 +943,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The FWFAsset that has been added to this datasource.
         """
-        asset = FWFAsset(  # type: ignore[call-arg]
+        asset = FWFAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             filepath_or_buffer=filepath_or_buffer,
             **kwargs,
@@ -954,7 +969,7 @@ class PandasDatasource(_PandasDatasource):
             A Batch using an ephemeral FWFAsset.
         """
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: FWFAsset = self.add_fwf_asset(  # type: ignore[valid-type]
+        asset: FWFAsset = self.add_fwf_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             filepath_or_buffer=filepath_or_buffer,
             **kwargs,
@@ -967,7 +982,7 @@ class PandasDatasource(_PandasDatasource):
         name: str,
         query: str,
         **kwargs,
-    ) -> GBQAsset:  # type: ignore[valid-type]
+    ) -> GBQAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add a GBQ data asset to the datasource.
 
@@ -979,7 +994,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The GBQAsset that has been added to this datasource.
         """
-        asset = GBQAsset(  # type: ignore[call-arg]
+        asset = GBQAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             query=query,
             **kwargs,
@@ -1005,7 +1020,7 @@ class PandasDatasource(_PandasDatasource):
             A Batch using an ephemeral GBQAsset.
         """
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: GBQAsset = self.add_gbq_asset(  # type: ignore[valid-type]
+        asset: GBQAsset = self.add_gbq_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             query=query,
             **kwargs,
@@ -1018,7 +1033,7 @@ class PandasDatasource(_PandasDatasource):
         name: str,
         path_or_buf: pd.HDFStore | os.PathLike | str,
         **kwargs,
-    ) -> HDFAsset:  # type: ignore[valid-type]
+    ) -> HDFAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add an HDF data asset to the datasource.
 
@@ -1030,7 +1045,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The HDFAsset that has been added to this datasource.
         """
-        asset = HDFAsset(  # type: ignore[call-arg]
+        asset = HDFAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             path_or_buf=path_or_buf,
             **kwargs,
@@ -1056,7 +1071,7 @@ class PandasDatasource(_PandasDatasource):
             A Batch using an ephemeral HDFAsset.
         """
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: HDFAsset = self.add_hdf_asset(  # type: ignore[valid-type]
+        asset: HDFAsset = self.add_hdf_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             path_or_buf=path_or_buf,
             **kwargs,
@@ -1069,7 +1084,7 @@ class PandasDatasource(_PandasDatasource):
         name: str,
         io: os.PathLike | str,
         **kwargs,
-    ) -> HTMLAsset:  # type: ignore[valid-type]
+    ) -> HTMLAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add an HTML data asset to the datasource.
 
@@ -1081,7 +1096,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The HTMLAsset that has been added to this datasource.
         """
-        asset = HTMLAsset(  # type: ignore[call-arg]
+        asset = HTMLAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             io=io,
             **kwargs,
@@ -1107,7 +1122,7 @@ class PandasDatasource(_PandasDatasource):
             A Batch using an ephemeral HTMLAsset.
         """
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: HTMLAsset = self.add_html_asset(  # type: ignore[valid-type]
+        asset: HTMLAsset = self.add_html_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             io=io,
             **kwargs,
@@ -1120,7 +1135,7 @@ class PandasDatasource(_PandasDatasource):
         name: str,
         path_or_buf: pydantic.Json | pydantic.FilePath | pydantic.AnyUrl,
         **kwargs,
-    ) -> JSONAsset:  # type: ignore[valid-type]
+    ) -> JSONAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add a JSON data asset to the datasource.
 
@@ -1132,7 +1147,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The JSONAsset that has been added to this datasource.
         """
-        asset = JSONAsset(  # type: ignore[call-arg]
+        asset = JSONAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             path_or_buf=path_or_buf,
             **kwargs,
@@ -1158,7 +1173,7 @@ class PandasDatasource(_PandasDatasource):
             A Batch using an ephemeral JSONAsset.
         """
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: JSONAsset = self.add_json_asset(  # type: ignore[valid-type]
+        asset: JSONAsset = self.add_json_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             path_or_buf=path_or_buf,
             **kwargs,
@@ -1171,7 +1186,7 @@ class PandasDatasource(_PandasDatasource):
         name: str,
         path: pydantic.FilePath | pydantic.AnyUrl,
         **kwargs,
-    ) -> ORCAsset:  # type: ignore[valid-type]
+    ) -> ORCAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add an ORC file as a DataAsset to this PandasDatasource object.
 
@@ -1183,7 +1198,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The ORCAsset that has been added to this datasource.
         """
-        asset = ORCAsset(  # type: ignore[call-arg]
+        asset = ORCAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             path=path,
             **kwargs,
@@ -1207,9 +1222,9 @@ class PandasDatasource(_PandasDatasource):
 
         Returns:
             A Batch using an ephemeral ORCAsset.
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: ORCAsset = self.add_orc_asset(  # type: ignore[valid-type]
+        asset: ORCAsset = self.add_orc_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             path=path,
             **kwargs,
@@ -1222,7 +1237,7 @@ class PandasDatasource(_PandasDatasource):
         name: str,
         path: pydantic.FilePath | pydantic.AnyUrl,
         **kwargs,
-    ) -> ParquetAsset:  # type: ignore[valid-type]
+    ) -> ParquetAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add a parquet file as a DataAsset to this PandasDatasource object.
 
@@ -1234,7 +1249,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The ParquetAsset that has been added to this datasource.
         """
-        asset = ParquetAsset(  # type: ignore[call-arg]
+        asset = ParquetAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             path=path,
             **kwargs,
@@ -1258,9 +1273,9 @@ class PandasDatasource(_PandasDatasource):
 
         Returns:
             A Batch using an ephemeral ParquetAsset.
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: ParquetAsset = self.add_parquet_asset(  # type: ignore[valid-type]
+        asset: ParquetAsset = self.add_parquet_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             path=path,
             **kwargs,
@@ -1273,7 +1288,7 @@ class PandasDatasource(_PandasDatasource):
         name: str,
         filepath_or_buffer: pydantic.FilePath | pydantic.AnyUrl,
         **kwargs,
-    ) -> PickleAsset:  # type: ignore[valid-type]
+    ) -> PickleAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add a pickle file as a DataAsset to this PandasDatasource object.
 
@@ -1285,7 +1300,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The PickleAsset that has been added to this datasource.
         """
-        asset = PickleAsset(  # type: ignore[call-arg]
+        asset = PickleAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             filepath_or_buffer=filepath_or_buffer,
             **kwargs,
@@ -1309,9 +1324,9 @@ class PandasDatasource(_PandasDatasource):
 
         Returns:
             A Batch using an ephemeral PickleAsset.
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: PickleAsset = self.add_pickle_asset(  # type: ignore[valid-type]
+        asset: PickleAsset = self.add_pickle_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             filepath_or_buffer=filepath_or_buffer,
             **kwargs,
@@ -1324,7 +1339,7 @@ class PandasDatasource(_PandasDatasource):
         name: str,
         filepath_or_buffer: pydantic.FilePath | pydantic.AnyUrl,
         **kwargs,
-    ) -> SASAsset:  # type: ignore[valid-type]
+    ) -> SASAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add a SAS data asset to the datasource.
 
@@ -1336,7 +1351,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The SASAsset that has been added to this datasource.
         """
-        asset = SASAsset(  # type: ignore[call-arg]
+        asset = SASAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             filepath_or_buffer=filepath_or_buffer,
             **kwargs,
@@ -1362,7 +1377,7 @@ class PandasDatasource(_PandasDatasource):
             A Batch using an ephemeral SASAsset.
         """
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: SASAsset = self.add_sas_asset(  # type: ignore[valid-type]
+        asset: SASAsset = self.add_sas_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             filepath_or_buffer=filepath_or_buffer,
             **kwargs,
@@ -1375,7 +1390,7 @@ class PandasDatasource(_PandasDatasource):
         name: str,
         path: pydantic.FilePath,
         **kwargs,
-    ) -> SPSSAsset:  # type: ignore[valid-type]
+    ) -> SPSSAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add an SPSS data asset to the datasource.
 
@@ -1387,7 +1402,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The SPSSAsset that has been added to this datasource.
         """
-        asset = SPSSAsset(  # type: ignore[call-arg]
+        asset = SPSSAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             path=path,
             **kwargs,
@@ -1413,7 +1428,7 @@ class PandasDatasource(_PandasDatasource):
             A Batch using an ephemeral SPSSAsset.
         """
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: SPSSAsset = self.add_parquet_asset(  # type: ignore[valid-type]
+        asset: SPSSAsset = self.add_parquet_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             path=path,
             **kwargs,
@@ -1424,10 +1439,10 @@ class PandasDatasource(_PandasDatasource):
     def add_sql_asset(
         self,
         name: str,
-        sql: sa.select | sa.text | str,
+        sql: sa.select | sa.text | str,  # type: ignore[valid-type] # FIXME CoP
         con: sqlalchemy.Engine | sqlite3.Connection | str,
         **kwargs,
-    ) -> SQLAsset:  # type: ignore[valid-type]
+    ) -> SQLAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add a SQL data asset to the datasource.
 
@@ -1440,7 +1455,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The SQLAsset that has been added to this datasource.
         """
-        asset = SQLAsset(  # type: ignore[call-arg]
+        asset = SQLAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             sql=sql,
             con=con,
@@ -1451,7 +1466,7 @@ class PandasDatasource(_PandasDatasource):
     @public_api
     def read_sql(
         self,
-        sql: sa.select | sa.text | str,
+        sql: sa.select | sa.text | str,  # type: ignore[valid-type] # FIXME CoP
         con: sqlalchemy.Engine | sqlite3.Connection | str,
         asset_name: Optional[str] = None,
         **kwargs,
@@ -1469,7 +1484,7 @@ class PandasDatasource(_PandasDatasource):
             A Batch using an ephemeral SQLAsset.
         """
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: SQLAsset = self.add_sql_asset(  # type: ignore[valid-type]
+        asset: SQLAsset = self.add_sql_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             sql=sql,
             con=con,
@@ -1481,10 +1496,10 @@ class PandasDatasource(_PandasDatasource):
     def add_sql_query_asset(
         self,
         name: str,
-        sql: sa.select | sa.text | str,
+        sql: sa.select | sa.text | str,  # type: ignore[valid-type] # FIXME CoP
         con: sqlalchemy.Engine | sqlite3.Connection | str,
         **kwargs,
-    ) -> SQLQueryAsset:  # type: ignore[valid-type]
+    ) -> SQLQueryAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add a SQL query data asset to the datasource.
 
@@ -1497,7 +1512,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The SQLQueryAsset that has been added to this datasource.
         """
-        asset = SQLQueryAsset(  # type: ignore[call-arg]
+        asset = SQLQueryAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             sql=sql,
             con=con,
@@ -1508,7 +1523,7 @@ class PandasDatasource(_PandasDatasource):
     @public_api
     def read_sql_query(
         self,
-        sql: sa.select | sa.text | str,
+        sql: sa.select | sa.text | str,  # type: ignore[valid-type] # FIXME CoP
         con: sqlalchemy.Engine | sqlite3.Connection | str,
         asset_name: Optional[str] = None,
         **kwargs,
@@ -1526,7 +1541,7 @@ class PandasDatasource(_PandasDatasource):
             A Batch using an ephemeral SQLQueryAsset.
         """
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: SQLQueryAsset = self.add_sql_query_asset(  # type: ignore[valid-type]
+        asset: SQLQueryAsset = self.add_sql_query_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             sql=sql,
             con=con,
@@ -1541,7 +1556,7 @@ class PandasDatasource(_PandasDatasource):
         table_name: str,
         con: sqlalchemy.Engine | str,
         **kwargs,
-    ) -> SQLTableAsset:  # type: ignore[valid-type]
+    ) -> SQLTableAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add a SQL table data asset to the datasource.
 
@@ -1554,7 +1569,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The SQLTableAsset that has been added to this datasource.
         """
-        asset = SQLTableAsset(  # type: ignore[call-arg]
+        asset = SQLTableAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             table_name=table_name,
             con=con,
@@ -1583,7 +1598,7 @@ class PandasDatasource(_PandasDatasource):
             A Batch using an ephemeral SQLTableAsset.
         """
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: SQLTableAsset = self.add_sql_table_asset(  # type: ignore[valid-type]
+        asset: SQLTableAsset = self.add_sql_table_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             table_name=table_name,
             con=con,
@@ -1597,7 +1612,7 @@ class PandasDatasource(_PandasDatasource):
         name: str,
         filepath_or_buffer: pydantic.FilePath | pydantic.AnyUrl,
         **kwargs,
-    ) -> StataAsset:  # type: ignore[valid-type]
+    ) -> StataAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add a Stata data asset to the datasource.
 
@@ -1609,7 +1624,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The StataAsset that has been added to this datasource.
         """
-        asset = StataAsset(  # type: ignore[call-arg]
+        asset = StataAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             filepath_or_buffer=filepath_or_buffer,
             **kwargs,
@@ -1635,7 +1650,7 @@ class PandasDatasource(_PandasDatasource):
             A Batch using an ephemeral StataAsset.
         """
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: StataAsset = self.add_stata_asset(  # type: ignore[valid-type]
+        asset: StataAsset = self.add_stata_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             filepath_or_buffer=filepath_or_buffer,
             **kwargs,
@@ -1648,7 +1663,7 @@ class PandasDatasource(_PandasDatasource):
         name: str,
         filepath_or_buffer: pydantic.FilePath | pydantic.AnyUrl,
         **kwargs,
-    ) -> TableAsset:  # type: ignore[valid-type]
+    ) -> TableAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add a Table data asset to the datasource.
 
@@ -1660,7 +1675,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The TableAsset that has been added to this datasource.
         """
-        asset = TableAsset(  # type: ignore[call-arg]
+        asset = TableAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             filepath_or_buffer=filepath_or_buffer,
             **kwargs,
@@ -1686,7 +1701,7 @@ class PandasDatasource(_PandasDatasource):
             A Batch using an ephemeral TableAsset.
         """
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: TableAsset = self.add_table_asset(  # type: ignore[valid-type]
+        asset: TableAsset = self.add_table_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             filepath_or_buffer=filepath_or_buffer,
             **kwargs,
@@ -1699,7 +1714,7 @@ class PandasDatasource(_PandasDatasource):
         name: str,
         path_or_buffer: pydantic.FilePath | pydantic.AnyUrl,
         **kwargs,
-    ) -> XMLAsset:  # type: ignore[valid-type]
+    ) -> XMLAsset:  # type: ignore[valid-type] # FIXME CoP
         """
         Add an XML data asset to the datasource.
 
@@ -1711,7 +1726,7 @@ class PandasDatasource(_PandasDatasource):
         Returns:
             The XMLAsset that has been added to this datasource.
         """
-        asset = XMLAsset(  # type: ignore[call-arg]
+        asset = XMLAsset(  # type: ignore[call-arg] # FIXME CoP
             name=name,
             path_or_buffer=path_or_buffer,
             **kwargs,
@@ -1737,7 +1752,7 @@ class PandasDatasource(_PandasDatasource):
             A Batch using an ephemeral XMLAsset.
         """
         name: str = self._validate_asset_name(asset_name=asset_name)
-        asset: XMLAsset = self.add_xml_asset(  # type: ignore[valid-type]
+        asset: XMLAsset = self.add_xml_asset(  # type: ignore[valid-type] # FIXME CoP
             name=name,
             path_or_buffer=path_or_buffer,
             **kwargs,
@@ -1746,117 +1761,117 @@ class PandasDatasource(_PandasDatasource):
 
     # attr-defined issue
     # https://github.com/python/mypy/issues/12472
-    add_clipboard_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    add_clipboard_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_clipboard_asset, ClipboardAsset, exclude={"type"}
     )
-    read_clipboard.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_clipboard.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         read_clipboard, ClipboardAsset, exclude={"type"}
     )
-    add_csv_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    add_csv_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_csv_asset, CSVAsset, exclude={"type"}
     )
-    read_csv.__signature__ = _merge_signatures(read_csv, CSVAsset, exclude={"type"})  # type: ignore[attr-defined]
-    add_excel_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_csv.__signature__ = _merge_signatures(read_csv, CSVAsset, exclude={"type"})  # type: ignore[attr-defined] # FIXME CoP
+    add_excel_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_excel_asset, ExcelAsset, exclude={"type"}
     )
-    read_excel.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_excel.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         read_excel, ExcelAsset, exclude={"type"}
     )
-    add_feather_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    add_feather_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_feather_asset, FeatherAsset, exclude={"type"}
     )
-    read_feather.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_feather.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         read_feather, FeatherAsset, exclude={"type"}
     )
-    add_fwf_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    add_fwf_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_fwf_asset, FWFAsset, exclude={"type"}
     )
-    read_fwf.__signature__ = _merge_signatures(read_fwf, FWFAsset, exclude={"type"})  # type: ignore[attr-defined]
-    add_gbq_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_fwf.__signature__ = _merge_signatures(read_fwf, FWFAsset, exclude={"type"})  # type: ignore[attr-defined] # FIXME CoP
+    add_gbq_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_gbq_asset, GBQAsset, exclude={"type"}
     )
-    read_gbq.__signature__ = _merge_signatures(read_gbq, GBQAsset, exclude={"type"})  # type: ignore[attr-defined]
-    add_hdf_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_gbq.__signature__ = _merge_signatures(read_gbq, GBQAsset, exclude={"type"})  # type: ignore[attr-defined] # FIXME CoP
+    add_hdf_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_hdf_asset, HDFAsset, exclude={"type"}
     )
-    read_hdf.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_hdf.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         read_hdf, HDFAsset, exclude={"type"}
     )
-    add_html_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    add_html_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_html_asset, HTMLAsset, exclude={"type"}
     )
-    read_html.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_html.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         read_html, HTMLAsset, exclude={"type"}
     )
-    add_json_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    add_json_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_json_asset, JSONAsset, exclude={"type"}
     )
-    read_json.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_json.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         read_json, JSONAsset, exclude={"type"}
     )
-    add_orc_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    add_orc_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_orc_asset, ORCAsset, exclude={"type"}
     )
-    read_orc.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_orc.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         read_orc, ORCAsset, exclude={"type"}
     )
-    add_parquet_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    add_parquet_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_parquet_asset, ParquetAsset, exclude={"type"}
     )
-    read_parquet.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_parquet.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         read_parquet, ParquetAsset, exclude={"type"}
     )
-    add_pickle_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    add_pickle_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_pickle_asset, PickleAsset, exclude={"type"}
     )
-    read_pickle.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_pickle.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         read_pickle, PickleAsset, exclude={"type"}
     )
-    add_sas_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    add_sas_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_sas_asset, SASAsset, exclude={"type"}
     )
-    read_sas.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_sas.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         read_sas, SASAsset, exclude={"type"}
     )
-    add_spss_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    add_spss_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_spss_asset, SPSSAsset, exclude={"type"}
     )
-    read_spss.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_spss.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         read_spss, SPSSAsset, exclude={"type"}
     )
-    add_sql_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    add_sql_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_sql_asset, SQLAsset, exclude={"type"}
     )
-    read_sql.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_sql.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         read_sql, SQLAsset, exclude={"type"}
     )
-    add_sql_query_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    add_sql_query_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_sql_query_asset, SQLQueryAsset, exclude={"type"}
     )
-    read_sql_query.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_sql_query.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         read_sql_query, SQLQueryAsset, exclude={"type"}
     )
-    add_sql_table_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    add_sql_table_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_sql_table_asset, SQLTableAsset, exclude={"type"}
     )
-    read_sql_table.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_sql_table.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         read_sql_table, SQLTableAsset, exclude={"type"}
     )
-    add_stata_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    add_stata_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_stata_asset, StataAsset, exclude={"type"}
     )
-    read_stata.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_stata.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         read_stata, StataAsset, exclude={"type"}
     )
-    add_table_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    add_table_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_table_asset, TableAsset, exclude={"type"}
     )
-    read_table.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_table.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         read_table, TableAsset, exclude={"type"}
     )
-    add_xml_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    add_xml_asset.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         add_xml_asset, XMLAsset, exclude={"type"}
     )
-    read_xml.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+    read_xml.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
         read_xml, XMLAsset, exclude={"type"}
     )

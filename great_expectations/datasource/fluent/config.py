@@ -40,7 +40,7 @@ from great_expectations.datasource.fluent.interfaces import Datasource
 from great_expectations.datasource.fluent.sources import (
     DEFAULT_PANDAS_DATA_ASSET_NAME,
     DEFAULT_PANDAS_DATASOURCE_NAME,
-    _SourceFactories,
+    DataSourceManager,
 )
 
 if TYPE_CHECKING:
@@ -76,7 +76,7 @@ _MISSING_FLUENT_DATASOURCES_ERRORS: Final[List[PydanticErrorDict]] = [
 _MISSING: Final = object()
 
 JSON_ENCODERS: dict[Type, Callable] = {}
-if TextClause:
+if TextClause:  # type: ignore[truthy-function] # FIXME CoP
     JSON_ENCODERS[TextClause] = lambda v: str(v)
 
 T = TypeVar("T")
@@ -88,15 +88,15 @@ class GxConfig(FluentBaseModel):
     fluent_datasources: List[Datasource] = Field(..., description=_FLUENT_STYLE_DESCRIPTION)
 
     _EXCLUDE_FROM_DATASOURCE_SERIALIZATION: ClassVar[Set[str]] = {
-        _DATASOURCE_NAME_KEY,  # The "name" field is set in validation upon deserialization from configuration key; hence, it should not be serialized.  # noqa: E501
+        _DATASOURCE_NAME_KEY,  # The "name" field is set in validation upon deserialization from configuration key; hence, it should not be serialized.  # noqa: E501 # FIXME CoP
     }
 
     _EXCLUDE_FROM_DATA_ASSET_SERIALIZATION: ClassVar[Set[str]] = {
-        _DATA_ASSET_NAME_KEY,  # The "name" field is set in validation upon deserialization from configuration key; hence, it should not be serialized.  # noqa: E501
+        _DATA_ASSET_NAME_KEY,  # The "name" field is set in validation upon deserialization from configuration key; hence, it should not be serialized.  # noqa: E501 # FIXME CoP
     }
 
     _EXCLUDE_FROM_BATCH_DEFINITION_SERIALIZATION: ClassVar[Set[str]] = {
-        _BATCH_DEFINITION_NAME_KEY,  # The "name" field is set in validation upon deserialization from configuration key; hence, it should not be serialized.  # noqa: E501
+        _BATCH_DEFINITION_NAME_KEY,  # The "name" field is set in validation upon deserialization from configuration key; hence, it should not be serialized.  # noqa: E501 # FIXME CoP
     }
 
     class Config:
@@ -130,11 +130,11 @@ class GxConfig(FluentBaseModel):
         datasource: Datasource
         return {datasource.name for datasource in self.datasources}
 
-    def get_datasource(self, datasource_name: str) -> Datasource:
+    def get_datasource(self, name: str) -> Datasource:
         """Returns the Datasource referred to by datasource_name
 
         Args:
-            datasource_name: name of Datasource sought.
+            name: name of Datasource sought.
 
         Returns:
             Datasource -- if named "Datasource" objects exists; otherwise, exception is raised.
@@ -143,13 +143,13 @@ class GxConfig(FluentBaseModel):
             datasource: Datasource
             return list(
                 filter(
-                    lambda datasource: datasource.name == datasource_name,
+                    lambda datasource: datasource.name == name,
                     self.datasources,
                 )
             )[0]
         except IndexError as exc:
-            raise LookupError(  # noqa: TRY003
-                f"'{datasource_name}' not found. Available datasources are {self.get_datasource_names()}"  # noqa: E501
+            raise LookupError(  # noqa: TRY003 # FIXME CoP
+                f"'{name}' not found. Available datasources are {self.get_datasource_names()}"
             ) from exc
 
     def update_datasources(self, datasources: Dict[str, Datasource]) -> None:
@@ -163,12 +163,12 @@ class GxConfig(FluentBaseModel):
         datasources_as_dict.update(datasources)
         self.fluent_datasources = list(datasources_as_dict.values())
 
-    def pop(self, datasource_name: str, default: T = _MISSING) -> Datasource | T:  # type: ignore[assignment] # sentinel value is never returned
+    def pop_datasource(self, name: str, default: T = _MISSING) -> Datasource | T:  # type: ignore[assignment] # sentinel value is never returned
         """
         Returns and deletes the Datasource referred to by datasource_name
 
         Args:
-            datasource_name: name of Datasource sought.
+            name: name of Datasource sought.
 
         Returns:
             Datasource -- if named "Datasource" objects exists or the provided default;
@@ -177,9 +177,9 @@ class GxConfig(FluentBaseModel):
         ds_dicts = self.get_datasources_as_dict()
         result: T | Datasource
         if default is _MISSING:
-            result = ds_dicts.pop(datasource_name)
+            result = ds_dicts.pop(name)
         else:
-            result = ds_dicts.pop(datasource_name, default)
+            result = ds_dicts.pop(name, default)
 
         self.fluent_datasources = list(ds_dicts.values())
         return result
@@ -187,7 +187,7 @@ class GxConfig(FluentBaseModel):
     # noinspection PyNestedDecorators
     @validator(_FLUENT_DATASOURCES_KEY, pre=True)
     @classmethod
-    def _load_datasource_subtype(cls, v: List[dict]):  # noqa: C901 - too complex
+    def _load_datasource_subtype(cls, v: List[dict]):  # noqa: C901 #  too complex
         logger.info(f"Loading 'datasources' ->\n{pf(v, depth=2)}")
         loaded_datasources: List[Datasource] = []
 
@@ -197,13 +197,13 @@ class GxConfig(FluentBaseModel):
             if not ds_type_name:
                 # TODO: (kilo59 122222) ideally this would be raised by `Datasource` validation
                 # https://github.com/pydantic/pydantic/issues/734
-                raise ValueError(f"'{ds_name}' is missing a 'type' entry")  # noqa: TRY003
+                raise ValueError(f"'{ds_name}' is missing a 'type' entry")  # noqa: TRY003 # FIXME CoP
 
             try:
-                ds_type: Type[Datasource] = _SourceFactories.type_lookup[ds_type_name]
+                ds_type: Type[Datasource] = DataSourceManager.type_lookup[ds_type_name]
                 logger.debug(f"Instantiating '{ds_name}' as {ds_type}")
             except KeyError as type_lookup_err:
-                raise ValueError(  # noqa: TRY003
+                raise ValueError(  # noqa: TRY003 # FIXME CoP
                     f"'{ds_name}' has unsupported 'type' - {type_lookup_err}"
                 ) from type_lookup_err
 
@@ -214,7 +214,7 @@ class GxConfig(FluentBaseModel):
 
             # the ephemeral asset should never be serialized
             if DEFAULT_PANDAS_DATA_ASSET_NAME in datasource.get_assets_as_dict():
-                datasource.delete_asset(asset_name=DEFAULT_PANDAS_DATA_ASSET_NAME)
+                datasource.delete_asset(name=DEFAULT_PANDAS_DATA_ASSET_NAME)
 
             # if the default pandas datasource has no assets, it should not be serialized
             if datasource.name != DEFAULT_PANDAS_DATASOURCE_NAME or len(datasource.assets) > 0:
@@ -244,7 +244,7 @@ class GxConfig(FluentBaseModel):
 
         TODO (kilo59) 122822: remove this as soon as it's no longer needed. Such as when
         we use a new `config_version` instead of `fluent_datasources` key.
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         loaded = yaml.load(f)
         logger.debug(f"loaded from yaml ->\n{pf(loaded, depth=3)}\n")
         loaded = _convert_fluent_datasources_loaded_from_yaml_to_internal_object_representation(
@@ -289,7 +289,7 @@ class GxConfig(FluentBaseModel):
     ) -> pathlib.Path: ...
 
     @override
-    def yaml(  # noqa: PLR0913
+    def yaml(  # noqa: PLR0913 # FIXME CoP
         self,
         stream_or_path: Union[StringIO, pathlib.Path, None] = None,
         *,
@@ -343,7 +343,7 @@ class GxConfig(FluentBaseModel):
             datasource_config: dict
             for datasource_config in fluent_datasources:
                 datasource_name = datasource_config[_DATASOURCE_NAME_KEY]
-                datasource_config = _exclude_fields_from_serialization(  # noqa: PLW2901
+                datasource_config = _exclude_fields_from_serialization(  # noqa: PLW2901 # FIXME CoP
                     source_dict=datasource_config,
                     exclusions=self._EXCLUDE_FROM_DATASOURCE_SERIALIZATION,
                 )

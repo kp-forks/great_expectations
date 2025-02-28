@@ -25,7 +25,7 @@ class DeprecatedMetaMetricProvider(MetaMetricProvider):
         Support isinstance and issubclass checks.
     """
 
-    # TODO: <Alex>All logging/warning directives should be placed into a common module to be imported as needed.</Alex>  # noqa: E501
+    # TODO: <Alex>All logging/warning directives should be placed into a common module to be imported as needed.</Alex>  # noqa: E501 # FIXME CoP
     # deprecated-v0.13.12
     warnings.simplefilter("default", category=DeprecationWarning)
 
@@ -45,7 +45,7 @@ class DeprecatedMetaMetricProvider(MetaMetricProvider):
                     warnings.warn(
                         f"""{cls.__name__} has been renamed to {alias} -- the alias {cls.__name__} is \
 deprecated as of v0.13.12 and will be removed in v0.16.
-""",  # noqa: E501
+""",  # noqa: E501 # FIXME CoP
                         DeprecationWarning,
                         stacklevel=2,
                     )
@@ -65,13 +65,13 @@ deprecated as of v0.13.12 and will be removed in v0.16.
                 warnings.warn(
                     f"""{b.__name__} has been renamed to {alias.__name__} -- the alias {b.__name__} is deprecated \
 as of v0.13.12 and will be removed in v0.16.
-""",  # noqa: E501
+""",  # noqa: E501 # FIXME CoP
                     DeprecationWarning,
                     stacklevel=2,
                 )
 
             # Avoid duplicate base classes.
-            b = alias or b  # noqa: PLW2901
+            b = alias or b  # noqa: PLW2901 # FIXME CoP
             if b not in fixed_bases:
                 fixed_bases.append(b)
 
@@ -79,10 +79,10 @@ as of v0.13.12 and will be removed in v0.16.
 
         return super().__new__(cls, name, fixed_bases, classdict, *args, **kwargs)
 
-    def __instancecheck__(cls, instance):
+    def __instancecheck__(cls, instance):  # type: ignore[explicit-override] # FIXME
         return any(cls.__subclasscheck__(c) for c in (type(instance), instance.__class__))
 
-    def __subclasscheck__(cls, subclass):
+    def __subclasscheck__(cls, subclass):  # type: ignore[explicit-override] # FIXME
         if subclass is cls:
             return True
         else:

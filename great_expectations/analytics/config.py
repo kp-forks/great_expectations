@@ -9,20 +9,17 @@ from great_expectations.compatibility.pydantic import (
     HttpUrl,
 )
 
-DUMMY_UUID = UUID("00000000-0000-0000-0000-000000000000")
-
 
 class _EnvConfig(BaseSettings):
-    gx_analytics_enabled: bool = True
+    gx_analytics_enabled: Optional[bool] = None
 
     gx_posthog_debug: bool = False
     gx_posthog_host: HttpUrl = "https://posthog.greatexpectations.io"  # type: ignore[assignment] # default will be coerced
-    gx_posthog_project_api_key: str = ""
-
-    _gx_cloud_dev_posthog_project_api_key: str = "phc_dq7deLClUIj5Sm9M40eAMthzkNtBOhF22ZDqPVxU14e"
+    gx_posthog_project_api_key: str = "phc_ph6ugZ1zq94dli0r1xgFg19fk2bb1EdDoLn9NZnCvRs"
+    gx_user_agent_str: Optional[str] = None
 
     @property
-    def posthog_enabled(self) -> bool:
+    def posthog_enabled(self) -> Optional[bool]:
         return self.gx_analytics_enabled
 
     @property
@@ -35,18 +32,16 @@ class _EnvConfig(BaseSettings):
 
     @property
     def posthog_project_api_key(self):
-        if self.gx_posthog_project_api_key:
-            return self.gx_posthog_project_api_key
-
-        return self._gx_cloud_dev_posthog_project_api_key
+        return self.gx_posthog_project_api_key
 
 
 class Config(GenericModel):
     organization_id: Optional[UUID] = None
     user_id: Optional[UUID] = None
-    data_context_id: UUID = DUMMY_UUID
-    oss_id: UUID = DUMMY_UUID
+    data_context_id: Optional[UUID] = None
+    oss_id: Optional[UUID] = None
     cloud_mode: bool = False
+    user_agent_str: Optional[str] = None
 
 
 ENV_CONFIG = _EnvConfig()
@@ -58,5 +53,5 @@ def get_config() -> Config:
 
 
 def update_config(config: Config):
-    global _CONFIG  # noqa: PLW0603
+    global _CONFIG  # noqa: PLW0603 # FIXME CoP
     _CONFIG = config

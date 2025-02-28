@@ -98,9 +98,9 @@ def _create_sqlite_source(
     # These type ignores when dealing with the execution_engine_override are because
     # it is a generic. We don't care about the exact type since we swap it out with our
     # mock for the purpose of this test and then replace it with the original.
-    original_override = SqliteDatasource.execution_engine_override  # type: ignore[misc]
+    original_override = SqliteDatasource.execution_engine_override  # type: ignore[misc] # FIXME CoP
     try:
-        SqliteDatasource.execution_engine_override = execution_eng_cls  # type: ignore[misc]
+        SqliteDatasource.execution_engine_override = execution_eng_cls  # type: ignore[misc] # FIXME CoP
         sqlite_datasource = SqliteDatasource(
             name="sqlite_datasource",
             connection_string="sqlite://",
@@ -110,7 +110,7 @@ def _create_sqlite_source(
             sqlite_datasource._data_context = data_context
         yield sqlite_datasource
     finally:
-        SqliteDatasource.execution_engine_override = original_override  # type: ignore[misc]
+        SqliteDatasource.execution_engine_override = original_override  # type: ignore[misc] # FIXME CoP
 
 
 @pytest.fixture
@@ -163,14 +163,15 @@ def test_sqlite_specific_partitioner(
         # Test getting all batches
         partitioner = partitioner_class(**partitioner_kwargs)
         batch_request = asset.build_batch_request(partitioner=partitioner)
-        all_batches = asset.get_batch_list_from_batch_request(batch_request=batch_request)
+        all_batches = asset.get_batch_identifiers_list(batch_request=batch_request)
         assert len(all_batches) == all_batches_cnt
         # Test getting specified batches
-        specified_batches = asset.get_batch_list_from_batch_request(
-            asset.build_batch_request(specified_batch_request, partitioner=partitioner)
-        )
+        batch_request = asset.build_batch_request(specified_batch_request, partitioner=partitioner)
+        specified_batches = asset.get_batch_identifiers_list(batch_request)
         assert len(specified_batches) == specified_batch_cnt
-        assert specified_batches[-1].metadata == last_specified_batch_metadata
+
+        batch = asset.get_batch(batch_request)
+        assert batch.metadata == last_specified_batch_metadata
 
 
 @pytest.mark.unit
@@ -178,5 +179,5 @@ def test_create_temp_table(empty_data_context, create_sqlite_source):
     with create_sqlite_source(data_context=empty_data_context, create_temp_table=False) as source:
         assert source.create_temp_table is False
         asset = source.add_query_asset(name="query_asset", query="SELECT * from table")
-        _ = asset.get_batch_list_from_batch_request(asset.build_batch_request())
+        _ = asset.get_batch(asset.build_batch_request())
         assert source._execution_engine._create_temp_table is False

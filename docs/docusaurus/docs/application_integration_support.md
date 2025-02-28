@@ -2,98 +2,84 @@
 title: Integration support policy
 ---
 
-For production environments, GX recommends using the integrations defined as GX-supported. 
+For production environments, GX recommends using GX Cloud integrations.
 
 GX uses libraries such as Pandas, Spark, and SQLAlchemy to integrate with different Data Sources. This also allows you to deploy GX with community-supported integrations.
 
-## Support categories
+## Levels of support
 
 The following are the levels of support provided by GX:
 
-- GX-supported - integrations are tested throughout the development lifecycle and are actively maintained and updated when new GX Cloud or GX OSS versions are released.
+- <b>GX Cloud</b> - GX Cloud supported integrations are available in GX Cloud. They are tested and are actively maintained with new GX Cloud releases.
 
-- Community-supported - integrations are implemented by the community or GX. GX is not responsible for ensuring integration reliability or compatibility.
+- <b>GX Core</b> - GX Core supported integrations are available in GX Core. They are tested and are actively maintained with new GX Core releases.
 
-## GX-supported
+- <b>Community</b> - Community supported integrations were initially implemented by GX or the community. It is up to the community for ongoing maintenance
 
-The following are the levels of support offered by GX for integrated applications, operating systems, and programming languages.
+## Integrations
 
-### Operating systems
+The following table defines the GX Cloud, GX Core, and Community Supported integrations.
 
-The following table defines the operating systems supported by GX Cloud and GX OSS.
+| Integration Type                 | GX Cloud                                                   | GX Core                                                                                    | Community            |
+| -------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------------- |
+| Data Sources<sup>1</sup>         | Snowflake<br/>Databricks (SQL)<br/> PostgreSQL<sup>2</sup> | Snowflake<br/>Databricks (SQL)<br/>PostgreSQL<br/>SQLite<br/>BigQuery<br/>Spark<br/>Pandas | MSSQL<br/>MySQL<br/> |
+| Configuration Stores<sup>3</sup> | In-app                                                     | File system                                                                                | None                 |
+| Data Doc Stores                  | In-app                                                     | File system                                                                                | None                 |
+| Actions                          | Email                                                      | Slack <br/>Email <br/>Microsoft Teams <br/>Custom<sup>4</sup>                              | None                 |
+| Credential Stores                | Environment variables                                      | Environment variables <br/> YAML<sup>5</sup>                                               | None                 |
+| Orchestrator                     | Airflow <sup>6</sup> <sup>7</sup>                          | Airflow <sup>6</sup> <sup>7</sup>                                                          | None                 |
 
-| GX Cloud                     | GX OSS                        |
-|------------------------------|-------------------------------|
-| Mac/Linux ¹                  | Mac/Linux                     | 
-
-¹ Required to run the GX Agent.
-
-### Python versions
-
-The following table defines the Python versions supported by GX Cloud and GX OSS. GX typically follows the [Python release cycle](https://devguide.python.org/versions/).
-
-| GX Cloud                    | GX OSS                          |
-|-----------------------------|---------------------------------|
-| N/A                         | 3.8 to 3.11                     | 
-
-### GX versions
-
-The following table defines the GX versions supported by GX Cloud and GX OSS.
-
-| GX Cloud                    | GX OSS                        |
-|-----------------------------|-------------------------------|
-| N/A                         | 0.17<br/>0.18                 | 
-
-### Integrations
-
-The following table defines the supported GX Cloud and GX OSS integrations.
-
-
-| Integration Type     | GX Cloud    | GX OSS                                                     |
-|----------------------|-------------|------------------------------------------------------------|
-| Data Source          | Snowflake ¹ | Snowflake<br/>Generic SQL ²                                |
-| Configuration Stores | N/A         | Filesystem<br/>AWS S3<br/>GCS Buckets<br/>Azure Blob Store |
-| Notifications        | N/A ³       | Slack ⁴<br/>email<br/>Microsoft Teams<br/>PagerDuty        |
-| Orchestrator         | Airflow ⁵   | Airflow ⁵                                                  |
-
-
-¹ Support for BigQuery will be available in a future release.<br/>
-² Connection strings for various SQL Data Sources are supported, but dialect-specific SQL commands are not.<br/>
-³ Support for Zapier will be available in a future release.<br/>
-⁴ When used with the GX OSS library.<br/>
-⁵ Although only Airflow is supported, GX Cloud and GX OSS should work with any orchestrator that executes Python code.
+<sup>1</sup> We've also seen GX work with the following data sources in the past but we can't guarantee ongoing compatibility. These data sources include Clickhouse, Vertica, Dremio, Teradata, Athena, EMR Spark, AWS Glue, Microsoft Fabric, Trino, Pandas on (S3, GCS, Azure), Databricks (Spark), and Spark on (S3, GCS, Azure).<br/>
+<sup>2</sup> Support for BigQuery in GX Cloud will be available in a future release.<br/>
+<sup>3</sup> This includes configuration storage for Expectations, Checkpoints, Validation Definitions, and Validation Results.<br/>
+<sup>4</sup> We support the general workflow for creating custom Actions but cannot help troubleshoot the domain-specific logic within a custom Action.<br/>
+<sup>5</sup> Use `config_variables.yml`.<br/>
+<sup>6</sup> Although only Airflow is supported, GX Cloud and GX Core should work with any orchestrator that executes Python code.<br/>
+<sup>7</sup> Airflow version 2.9.0+ required.<br/>
 
 ### GX components
 
-The following table defines the GX components supported by GX Cloud and GX OSS.
+The following table defines the GX components supported by GX Cloud and GX Core.
 
-| Component    | GX Cloud                                                                                         | GX OSS                                                                            |
-|--------------|--------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
-| Expectations | See [Available Expectations](/cloud/expectations/manage_expectations.md#available-expectations). | See [Create an Expectation](/core/define_expectations/create_an_expectation.md). |
-| GX Agent     | All versions                                                                                     | N/A                                                                               |
-
-
-## Community-supported
-
-The following integrated applications, operating systems, and programming languages are supported by the community.
+| Component    | GX Cloud                                                                                        | GX Core                                                               | Community                                                                  |
+| ------------ | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Expectations | See [Available Expectations](/cloud/expectations/manage_expectations.md#available-expectations) | See [Expectations Gallery](https://greatexpectations.io/expectations) | See [Legacy Gallery](https://greatexpectations.io/legacy/v1/expectations/) |
+| GX Agent     | All versions                                                                                    | N/A                                                                   | N/A                                                                        |
 
 ### Operating systems
 
-The following table lists the operating systems supported by the community.
+The following table defines the operating systems supported by GX Cloud and GX Core.
 
-| GX Cloud                       | GX OSS                        |
-|--------------------------------|-------------------------------|
-| N/A                            | Windows ¹                     | 
+| GX Cloud               | GX Core   | Community |
+| ---------------------- | --------- | --------- |
+| Mac/Linux <sup>1</sup> | Mac/Linux | Mac/Linux |
 
-¹ Untested and unsupported by GX.
+<sup>1</sup> GX does not currently support Windows. However, we've seen users successfully deploying GX on Windows.
 
-### Integrations
+### Python versions
 
-The following table lists the GX Cloud and GX OSS integrations supported by the community.
+The following table defines the Python versions supported by GX Cloud and GX Core. GX typically follows the [Python release cycle](https://devguide.python.org/versions/).
 
+| GX Cloud    | GX Core     | Community   |
+| ----------- | ----------- | ----------- |
+| 3.9 to 3.12 | 3.9 to 3.12 | 3.9 to 3.12 |
 
-| Integration Type | GX Cloud | GX OSS                                                                                                                                                                                                           |
-|------------------|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Data Sources     | N/A      | Pandas<br/>Spark<br/>Databricks (Spark)<br/>Databricks (SQL)<br/>Trino<br/>Clickhouse<br/>Dremio<br/> Teradata<br/>Vertica<br/>EMR Spark<br/>AWS Glue<br/>Google Cloud Storage<br/>Azure Blog Storage<br/>AWS S3 |
-| Notifications    | N/A      | Opsgenie<br/>Amazon SNS<br/>DataHub                                                                                                                                                                              |
-| Orchestrators    | N/A      | Prefect<br/>Dagster <br/>Flyte <br/>mage.ai                                                                                                                                                                      |
+### GX versions
+
+The following table defines the GX versions supported by GX Cloud and GX Core.
+
+| GX Cloud | GX Core | Community |
+| -------- | ------- | --------- |
+| ≥1.0     | ≥1.0    | ≥1.0      |
+
+### Web browsers
+
+The following web browsers are supported by GX Cloud.
+
+- [Google Chrome](https://www.google.com/chrome/) — the latest version is fully supported
+
+- [Mozilla Firefox](https://www.mozilla.org/en-US/firefox/) — the latest version is fully supported
+
+- [Apple Safari](https://www.apple.com/safari/) — the latest version is fully supported
+
+- [Microsoft Edge](https://www.microsoft.com/en-us/edge?ep=82&form=MA13KI&es=24) — the latest version is fully supported

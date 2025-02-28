@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Type
 
 from great_expectations.compatibility import pydantic
-from great_expectations.core.suite_parameters import (
-    SuiteParameterDict,  # noqa: TCH001
-)
+from great_expectations.core.types import Comparable  # noqa: TCH001 # FIXME CoP
 from great_expectations.expectations.expectation import (
     COLUMN_DESCRIPTION,
     ColumnAggregateExpectation,
     render_suite_parameter_string,
 )
+from great_expectations.expectations.metadata_types import DataQualityIssues
 from great_expectations.render import (
     LegacyDescriptiveRendererType,
     LegacyRendererType,
@@ -24,7 +22,6 @@ from great_expectations.render.renderer_configuration import (
 )
 from great_expectations.render.util import (
     handle_strict_min_max,
-    num_to_str,
     parse_row_condition_string_pandas_engine,
     substitute_none_for_missing,
 )
@@ -57,18 +54,18 @@ SUPPORTED_DATA_SOURCES = [
     "PostgreSQL",
     "MySQL",
     "MSSQL",
-    "Redshift",
     "BigQuery",
     "Snowflake",
+    "Databricks (SQL)",
 ]
-DATA_QUALITY_ISSUES = ["Cardinality"]
+DATA_QUALITY_ISSUES = [DataQualityIssues.UNIQUENESS.value]
 
 
 class ExpectColumnUniqueValueCountToBeBetween(ColumnAggregateExpectation):
     __doc__ = f"""{EXPECTATION_SHORT_DESCRIPTION}
 
-    expect_column_unique_value_count_to_be_between is a \
-    [Column Aggregate Expectation](https://docs.greatexpectations.io/docs/guides/expectations/creating_custom_expectations/how_to_create_custom_column_aggregate_expectations).
+    ExpectColumnUniqueValueCountToBeBetween is a \
+    Column Aggregate Expectation.
 
     Column Aggregate Expectations are one of the most common types of Expectation.
     They are evaluated for a single column, and produce an aggregate Metric, such as a mean, standard deviation, number of unique values, column type, etc.
@@ -110,9 +107,9 @@ class ExpectColumnUniqueValueCountToBeBetween(ColumnAggregateExpectation):
           representing the number of unique values the column
 
     See Also:
-        [expect_column_proportion_of_unique_values_to_be_between](https://greatexpectations.io/expectations/expect_column_proportion_of_unique_values_to_be_between)
+        [ExpectColumnProportionOfUniqueValuesToBeBetween](https://greatexpectations.io/expectations/expect_column_proportion_of_unique_values_to_be_between)
 
-    Supported Datasources:
+    Supported Data Sources:
         [{SUPPORTED_DATA_SOURCES[0]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[1]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[2]}](https://docs.greatexpectations.io/docs/application_integration_support/)
@@ -123,7 +120,7 @@ class ExpectColumnUniqueValueCountToBeBetween(ColumnAggregateExpectation):
         [{SUPPORTED_DATA_SOURCES[7]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[8]}](https://docs.greatexpectations.io/docs/application_integration_support/)
 
-    Data Quality Category:
+    Data Quality Issues:
         {DATA_QUALITY_ISSUES[0]}
 
     Example Data:
@@ -177,20 +174,20 @@ class ExpectColumnUniqueValueCountToBeBetween(ColumnAggregateExpectation):
                   "meta": {{}},
                   "success": false
                 }}
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
-    min_value: Union[float, SuiteParameterDict, datetime, None] = pydantic.Field(
-        None, description=MIN_VALUE_DESCRIPTION
+    min_value: Optional[Comparable] = pydantic.Field(
+        default=None, description=MIN_VALUE_DESCRIPTION
     )
-    max_value: Union[float, SuiteParameterDict, datetime, None] = pydantic.Field(
-        None, description=MAX_VALUE_DESCRIPTION
+    max_value: Optional[Comparable] = pydantic.Field(
+        default=None, description=MAX_VALUE_DESCRIPTION
     )
     strict_min: bool = pydantic.Field(
-        False,
+        default=False,
         description=STRICT_MIN_DESCRIPTION,
     )
     strict_max: bool = pydantic.Field(
-        False,
+        default=False,
         description=STRICT_MAX_DESCRIPTION,
     )
 
@@ -206,22 +203,28 @@ class ExpectColumnUniqueValueCountToBeBetween(ColumnAggregateExpectation):
 
     _library_metadata = library_metadata
 
-    # Setting necessary computation metric dependencies and defining kwargs, as well as assigning kwargs default values\  # noqa: E501
+    # Setting necessary computation metric dependencies and defining kwargs, as well as assigning kwargs default values\  # noqa: E501 # FIXME CoP
     metric_dependencies = ("column.distinct_values.count",)
     success_keys = (
         "min_value",
         "max_value",
+        "strict_min",
+        "strict_max",
     )
 
     args_keys = (
         "column",
         "min_value",
         "max_value",
+        "strict_min",
+        "strict_max",
     )
 
     """ A Column Aggregate Metric Decorator for the Unique Value Count"""
 
     class Config:
+        title = "Expect column unique value count to be between"
+
         @staticmethod
         def schema_extra(
             schema: Dict[str, Any], model: Type[ExpectColumnUniqueValueCountToBeBetween]
@@ -253,7 +256,7 @@ class ExpectColumnUniqueValueCountToBeBetween(ColumnAggregateExpectation):
             )
 
     @classmethod
-    def _prescriptive_template(  # noqa: C901, PLR0912
+    def _prescriptive_template(
         cls,
         renderer_configuration: RendererConfiguration,
     ) -> RendererConfiguration:
@@ -261,7 +264,6 @@ class ExpectColumnUniqueValueCountToBeBetween(ColumnAggregateExpectation):
             ("column", RendererValueType.STRING),
             ("min_value", [RendererValueType.NUMBER, RendererValueType.DATETIME]),
             ("max_value", [RendererValueType.NUMBER, RendererValueType.DATETIME]),
-            ("mostly", RendererValueType.NUMBER),
             ("strict_min", RendererValueType.BOOLEAN),
             ("strict_max", RendererValueType.BOOLEAN),
         )
@@ -284,23 +286,12 @@ class ExpectColumnUniqueValueCountToBeBetween(ColumnAggregateExpectation):
                     renderer_configuration=renderer_configuration
                 )
 
-            if params.mostly and params.mostly.value < 1.0:
-                renderer_configuration = cls._add_mostly_pct_param(
-                    renderer_configuration=renderer_configuration
-                )
-                if not params.min_value:
-                    template_str = f"must have {at_most_str} $max_value unique values, at least $mostly_pct % of the time."  # noqa: E501
-                elif not params.max_value:
-                    template_str = f"must have {at_least_str} $min_value unique values, at least $mostly_pct % of the time."  # noqa: E501
-                else:
-                    template_str = f"must have {at_least_str} $min_value and {at_most_str} $max_value unique values, at least $mostly_pct % of the time."  # noqa: E501
-            else:  # noqa: PLR5501
-                if not params.min_value:
-                    template_str = f"must have {at_most_str} $max_value unique values."
-                elif not params.max_value:
-                    template_str = f"must have {at_least_str} $min_value unique values."
-                else:
-                    template_str = f"must have {at_least_str} $min_value and {at_most_str} $max_value unique values."  # noqa: E501
+            if not params.min_value:
+                template_str = f"must have {at_most_str} $max_value unique values."
+            elif not params.max_value:
+                template_str = f"must have {at_least_str} $min_value unique values."
+            else:
+                template_str = f"must have {at_least_str} $min_value and {at_most_str} $max_value unique values."  # noqa: E501 # FIXME CoP
 
         if renderer_configuration.include_column_name:
             template_str = f"$column {template_str}"
@@ -312,7 +303,7 @@ class ExpectColumnUniqueValueCountToBeBetween(ColumnAggregateExpectation):
     @classmethod
     @renderer(renderer_type=LegacyRendererType.PRESCRIPTIVE)
     @render_suite_parameter_string
-    def _prescriptive_renderer(  # noqa: C901 - too complex
+    def _prescriptive_renderer(
         cls,
         configuration: Optional[ExpectationConfiguration] = None,
         result: Optional[ExpectationValidationResult] = None,
@@ -328,7 +319,6 @@ class ExpectColumnUniqueValueCountToBeBetween(ColumnAggregateExpectation):
                 "column",
                 "min_value",
                 "max_value",
-                "mostly",
                 "row_condition",
                 "condition_parser",
                 "strict_min",
@@ -340,23 +330,13 @@ class ExpectColumnUniqueValueCountToBeBetween(ColumnAggregateExpectation):
 
         if (params["min_value"] is None) and (params["max_value"] is None):
             template_str = "may have any number of unique values."
-        else:  # noqa: PLR5501
-            if params["mostly"] is not None and params["mostly"] < 1.0:
-                params["mostly_pct"] = num_to_str(params["mostly"] * 100, no_scientific=True)
-                # params["mostly_pct"] = "{:.14f}".format(params["mostly"]*100).rstrip("0").rstrip(".")  # noqa: E501
-                if params["min_value"] is None:
-                    template_str = f"must have {at_most_str} $max_value unique values, at least $mostly_pct % of the time."  # noqa: E501
-                elif params["max_value"] is None:
-                    template_str = f"must have {at_least_str} $min_value unique values, at least $mostly_pct % of the time."  # noqa: E501
-                else:
-                    template_str = f"must have {at_least_str} $min_value and {at_most_str} $max_value unique values, at least $mostly_pct % of the time."  # noqa: E501
-            else:  # noqa: PLR5501
-                if params["min_value"] is None:
-                    template_str = f"must have {at_most_str} $max_value unique values."
-                elif params["max_value"] is None:
-                    template_str = f"must have {at_least_str} $min_value unique values."
-                else:
-                    template_str = f"must have {at_least_str} $min_value and {at_most_str} $max_value unique values."  # noqa: E501
+        else:  # noqa: PLR5501 # FIXME CoP
+            if params["min_value"] is None:
+                template_str = f"must have {at_most_str} $max_value unique values."
+            elif params["max_value"] is None:
+                template_str = f"must have {at_least_str} $min_value unique values."
+            else:
+                template_str = f"must have {at_least_str} $min_value and {at_most_str} $max_value unique values."  # noqa: E501 # FIXME CoP
 
         if include_column_name:
             template_str = f"$column {template_str}"

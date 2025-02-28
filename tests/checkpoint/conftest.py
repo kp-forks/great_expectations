@@ -77,7 +77,7 @@ def fluent_batch_request(batch_request_as_dict: Dict[str, str]) -> FluentBatchRe
 def titanic_pandas_data_context_stats_enabled_and_expectation_suite_with_one_expectation(
     titanic_pandas_data_context_with_v013_datasource_with_checkpoints_v1_with_empty_store_stats_enabled,
 ):
-    context = titanic_pandas_data_context_with_v013_datasource_with_checkpoints_v1_with_empty_store_stats_enabled  # noqa: E501
+    context = titanic_pandas_data_context_with_v013_datasource_with_checkpoints_v1_with_empty_store_stats_enabled  # noqa: E501 # FIXME CoP
     # create expectation suite
     suite = context.suites.add(ExpectationSuite("my_expectation_suite"))
     expectation = gxe.ExpectColumnValuesToBeBetween(
@@ -92,13 +92,13 @@ def titanic_pandas_data_context_stats_enabled_and_expectation_suite_with_one_exp
 
 
 @pytest.fixture
-def titanic_data_context_with_fluent_pandas_datasources_stats_enabled_and_expectation_suite_with_one_expectation(  # noqa: E501
+def titanic_data_context_with_fluent_pandas_datasources_stats_enabled_and_expectation_suite_with_one_expectation(  # noqa: E501 # FIXME CoP
     titanic_data_context_with_fluent_pandas_datasources_with_checkpoints_v1_with_empty_store_stats_enabled,
 ):
-    context = titanic_data_context_with_fluent_pandas_datasources_with_checkpoints_v1_with_empty_store_stats_enabled  # noqa: E501
+    context = titanic_data_context_with_fluent_pandas_datasources_with_checkpoints_v1_with_empty_store_stats_enabled  # noqa: E501 # FIXME CoP
 
     datasource_name = "my_pandas_filesystem_datasource"
-    datasource = context.get_datasource(datasource_name=datasource_name)
+    datasource = context.data_sources.get(datasource_name=datasource_name)
 
     batching_regex = r"^Titanic_1911\.csv"
     glob_directive = "*.csv"
@@ -109,11 +109,11 @@ def titanic_data_context_with_fluent_pandas_datasources_stats_enabled_and_expect
     )
 
     datasource_name = "my_pandas_dataframes_datasource"
-    datasource = context.get_datasource(datasource_name=datasource_name)
+    datasource = context.data_sources.get(datasource_name=datasource_name)
 
     test_df: pd.DataFrame = pd.DataFrame(data={"col1": [1, 2], "col2": [3, 4]})
     asset = datasource.add_dataframe_asset(name="my_other_dataframe_asset")
-    _ = asset.build_batch_request(dataframe=test_df)
+    _ = asset.build_batch_request(options={"dataframe": test_df})
 
     # create expectation suite
     suite = context.suites.add(ExpectationSuite("my_expectation_suite"))
@@ -130,13 +130,13 @@ def titanic_data_context_with_fluent_pandas_datasources_stats_enabled_and_expect
 
 
 @pytest.fixture
-def titanic_data_context_with_fluent_pandas_and_spark_datasources_stats_enabled_and_expectation_suite_with_one_expectation(  # noqa: E501
+def titanic_data_context_with_fluent_pandas_and_spark_datasources_stats_enabled_and_expectation_suite_with_one_expectation(  # noqa: E501 # FIXME CoP
     titanic_data_context_with_fluent_pandas_and_spark_datasources_with_checkpoints_v1_with_empty_store_stats_enabled,
 ):
-    context = titanic_data_context_with_fluent_pandas_and_spark_datasources_with_checkpoints_v1_with_empty_store_stats_enabled  # noqa: E501
+    context = titanic_data_context_with_fluent_pandas_and_spark_datasources_with_checkpoints_v1_with_empty_store_stats_enabled  # noqa: E501 # FIXME CoP
 
     datasource_name = "my_pandas_filesystem_datasource"
-    datasource = context.get_datasource(datasource_name=datasource_name)
+    datasource = context.data_sources.get(datasource_name=datasource_name)
 
     batching_regex = r"^Titanic_1911\.csv"
     glob_directive = "*.csv"

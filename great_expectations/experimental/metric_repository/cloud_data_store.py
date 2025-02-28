@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import urllib.parse
 import uuid
+import weakref
 from typing import TYPE_CHECKING, Any, Dict, TypeVar
 
 from great_expectations.compatibility.pydantic import BaseModel
@@ -11,6 +12,7 @@ from great_expectations.experimental.metric_repository.data_store import DataSto
 from great_expectations.experimental.metric_repository.metrics import MetricRun
 
 if TYPE_CHECKING:
+    import requests
     from typing_extensions import TypeAlias
 
     from great_expectations.data_context import CloudDataContext
@@ -19,14 +21,6 @@ if TYPE_CHECKING:
 StorableTypes: TypeAlias = MetricRun
 
 T = TypeVar("T", bound=StorableTypes)
-
-
-class PayloadData(BaseModel):
-    type: str
-    attributes: Dict[str, Any]
-
-    class Config:
-        extra = "forbid"
 
 
 def orjson_dumps(v, *, default):
@@ -47,7 +41,7 @@ def orjson_loads(v, *args, **kwargs):
 
 
 class Payload(BaseModel):
-    data: PayloadData
+    data: Dict[str, Any]
 
     class Config:
         extra = "forbid"
@@ -70,29 +64,20 @@ class CloudDataStore(DataStore[StorableTypes]):
             access_token=context.ge_cloud_config.access_token,
             retry_count=0,  # Do not retry on authentication errors
         )
-
-    def _map_to_url(self, value: StorableTypes) -> str:
-        if isinstance(value, MetricRun):
-            return "/metric-runs"
-
-    def _map_to_resource_type(self, value: StorableTypes) -> str:
-        if isinstance(value, MetricRun):
-            return "metric-run"
+        # Finalizer to close the session when the object is garbage collected.
+        # https://docs.python.org/3.11/library/weakref.html#weakref.finalize
+        self._finalizer = weakref.finalize(self, close_session, self._session)
 
     def _build_payload(self, value: StorableTypes) -> str:
-        payload = Payload(
-            data=PayloadData(
-                type=self._map_to_resource_type(value),
-                attributes=value.dict(exclude={"metrics": {"__all__": {"__orig_class__"}}}),
-            )
-        )
+        payload = Payload(data=value.dict(exclude={"metrics": {"__all__": {"__orig_class__"}}}))
         return payload.json()
 
     def _build_url(self, value: StorableTypes) -> str:
         assert self._context.ge_cloud_config is not None
         config = self._context.ge_cloud_config
         return urllib.parse.urljoin(
-            config.base_url, f"organizations/{config.organization_id}{self._map_to_url(value)}"
+            config.base_url,
+            f"api/v1/organizations/{config.organization_id}/metric-runs",
         )
 
     @override
@@ -112,3 +97,17 @@ class CloudDataStore(DataStore[StorableTypes]):
 
         response_json = response.json()
         return uuid.UUID(response_json["id"])
+
+
+def close_session(session: requests.Session):
+    """Close the session.
+    Used by a finalizer to close the session when the CloudDataStore is garbage collected.
+
+    This is not a bound method on the CloudDataStore class because of this note
+    in the Python docs (https://docs.python.org/3.11/library/weakref.html#weakref.finalize):
+    Note It is important to ensure that func, args and kwargs do not own any references to obj,
+    either directly or indirectly, since otherwise obj will never be garbage collected.
+    In particular, func should not be a bound method of obj.
+
+    """
+    session.close()

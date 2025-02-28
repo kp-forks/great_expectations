@@ -25,7 +25,7 @@ class TableColumnCount(TableMetricProvider):
     metric_name = "table.column_count"
 
     @metric_value(engine=PandasExecutionEngine)
-    def _pandas(  # noqa: PLR0913
+    def _pandas(
         cls,
         execution_engine: ExecutionEngine,
         metric_domain_kwargs: dict,
@@ -34,10 +34,10 @@ class TableColumnCount(TableMetricProvider):
         runtime_configuration: dict,
     ):
         columns = metrics.get("table.columns")
-        return len(columns)  # type: ignore[arg-type]
+        return len(columns)  # type: ignore[arg-type] # FIXME CoP
 
     @metric_value(engine=SqlAlchemyExecutionEngine)
-    def _sqlalchemy(  # noqa: PLR0913
+    def _sqlalchemy(
         cls,
         execution_engine: ExecutionEngine,
         metric_domain_kwargs: dict,
@@ -46,10 +46,10 @@ class TableColumnCount(TableMetricProvider):
         runtime_configuration: dict,
     ):
         columns = metrics.get("table.columns")
-        return len(columns)  # type: ignore[arg-type]
+        return len(columns)  # type: ignore[arg-type] # FIXME CoP
 
     @metric_value(engine=SparkDFExecutionEngine)
-    def _spark(  # noqa: PLR0913
+    def _spark(
         cls,
         execution_engine: ExecutionEngine,
         metric_domain_kwargs: dict,
@@ -58,7 +58,7 @@ class TableColumnCount(TableMetricProvider):
         runtime_configuration: dict,
     ):
         columns = metrics.get("table.columns")
-        return len(columns)  # type: ignore[arg-type]
+        return len(columns)  # type: ignore[arg-type] # FIXME CoP
 
     @classmethod
     @override

@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Type, Union
 
 from great_expectations.compatibility import pydantic
-from great_expectations.core.suite_parameters import (
-    SuiteParameterDict,  # noqa: TCH001
-)
+from great_expectations.core.types import Comparable  # noqa: TCH001 # FIXME CoP
 from great_expectations.expectations.expectation import (
     COLUMN_DESCRIPTION,
     ColumnAggregateExpectation,
     render_suite_parameter_string,
 )
+from great_expectations.expectations.metadata_types import DataQualityIssues
 from great_expectations.render import LegacyRendererType, RenderedStringTemplateContent
 from great_expectations.render.renderer.renderer import renderer
 from great_expectations.render.renderer_configuration import (
@@ -53,11 +51,11 @@ SUPPORTED_DATA_SOURCES = [
     "PostgreSQL",
     "MySQL",
     "MSSQL",
-    "Redshift",
     "BigQuery",
     "Snowflake",
+    "Databricks (SQL)",
 ]
-DATA_QUALITY_ISSUES = ["Distribution"]
+DATA_QUALITY_ISSUES = [DataQualityIssues.NUMERIC.value]
 
 
 class ExpectColumnStdevToBeBetween(ColumnAggregateExpectation):
@@ -65,8 +63,8 @@ class ExpectColumnStdevToBeBetween(ColumnAggregateExpectation):
 
     Uses sample standard deviation (normalized by N-1).
 
-    expect_column_stdev_to_be_between is a \
-    [Column Aggregate Expectation](https://docs.greatexpectations.io/docs/guides/expectations/creating_custom_expectations/how_to_create_custom_column_aggregate_expectations).
+    ExpectColumnStdevToBeBetween is a \
+    Column Aggregate Expectation.
 
     Column Aggregate Expectations are one of the most common types of Expectation.
     They are evaluated for a single column, and produce an aggregate Metric, such as a mean, standard deviation, number of unique values, column type, etc.
@@ -108,10 +106,10 @@ class ExpectColumnStdevToBeBetween(ColumnAggregateExpectation):
           representing the true standard deviation for the column
 
     See Also:
-        [expect_column_mean_to_be_between](https://greatexpectations.io/expectations/expect_column_mean_to_be_between)
-        [expect_column_median_to_be_between](https://greatexpectations.io/expectations/expect_column_median_to_be_between)
+        [ExpectColumnMeanToBeBetween](https://greatexpectations.io/expectations/expect_column_mean_to_be_between)
+        [ExpectColumnMedianToBeBetween](https://greatexpectations.io/expectations/expect_column_median_to_be_between)
 
-    Supported Datasources:
+    Supported Data Sources:
         [{SUPPORTED_DATA_SOURCES[0]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[1]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[2]}](https://docs.greatexpectations.io/docs/application_integration_support/)
@@ -122,7 +120,7 @@ class ExpectColumnStdevToBeBetween(ColumnAggregateExpectation):
         [{SUPPORTED_DATA_SOURCES[7]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[8]}](https://docs.greatexpectations.io/docs/application_integration_support/)
 
-    Data Quality Category:
+    Data Quality Issues:
         {DATA_QUALITY_ISSUES[0]}
 
     Example Data:
@@ -176,19 +174,19 @@ class ExpectColumnStdevToBeBetween(ColumnAggregateExpectation):
                   "meta": {{}},
                   "success": false
                 }}
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
-    min_value: Union[float, SuiteParameterDict, datetime, None] = pydantic.Field(
-        None, description=MIN_VALUE_DESCRIPTION
+    min_value: Optional[Comparable] = pydantic.Field(
+        default=None, description=MIN_VALUE_DESCRIPTION
     )
-    max_value: Union[float, SuiteParameterDict, datetime, None] = pydantic.Field(
-        None, description=MAX_VALUE_DESCRIPTION
+    max_value: Optional[Comparable] = pydantic.Field(
+        default=None, description=MAX_VALUE_DESCRIPTION
     )
-    strict_min: bool = pydantic.Field(False, description=STRICT_MIN_DESCRIPTION)
-    strict_max: bool = pydantic.Field(False, description=STRICT_MAX_DESCRIPTION)
+    strict_min: bool = pydantic.Field(default=False, description=STRICT_MIN_DESCRIPTION)
+    strict_max: bool = pydantic.Field(default=False, description=STRICT_MAX_DESCRIPTION)
 
     # This dictionary contains metadata for display in the public gallery
-    library_metadata = {
+    library_metadata: ClassVar[Dict[str, Union[str, list, bool]]] = {
         "maturity": "production",
         "tags": ["core expectation", "column aggregate expectation"],
         "contributors": ["@great_expectations"],
@@ -216,6 +214,8 @@ class ExpectColumnStdevToBeBetween(ColumnAggregateExpectation):
     )
 
     class Config:
+        title = "Expect column standard deviation to be between"
+
         @staticmethod
         def schema_extra(schema: Dict[str, Any], model: Type[ExpectColumnStdevToBeBetween]) -> None:
             ColumnAggregateExpectation.Config.schema_extra(schema, model)
@@ -276,7 +276,7 @@ class ExpectColumnStdevToBeBetween(ColumnAggregateExpectation):
                 )
 
             if params.min_value and params.max_value:
-                template_str = f"standard deviation must be {at_least_str} $min_value and {at_most_str} $max_value."  # noqa: E501
+                template_str = f"standard deviation must be {at_least_str} $min_value and {at_most_str} $max_value."  # noqa: E501 # FIXME CoP
             elif not params.min_value:
                 template_str = f"standard deviation must be {at_most_str} $max_value."
             else:
@@ -323,7 +323,7 @@ class ExpectColumnStdevToBeBetween(ColumnAggregateExpectation):
             at_least_str, at_most_str = handle_strict_min_max(params)
 
             if params["min_value"] is not None and params["max_value"] is not None:
-                template_str = f"standard deviation must be {at_least_str} $min_value and {at_most_str} $max_value."  # noqa: E501
+                template_str = f"standard deviation must be {at_least_str} $min_value and {at_most_str} $max_value."  # noqa: E501 # FIXME CoP
             elif params["min_value"] is None:
                 template_str = f"standard deviation must be {at_most_str} $max_value."
             elif params["max_value"] is None:

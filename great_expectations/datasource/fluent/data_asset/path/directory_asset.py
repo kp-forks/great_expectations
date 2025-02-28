@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Generic, Optional
 from great_expectations import exceptions as gx_exceptions
 from great_expectations._docs_decorators import public_api
 from great_expectations.compatibility.typing_extensions import override
-from great_expectations.core import IDDict
 from great_expectations.core.batch import LegacyBatchDefinition
 from great_expectations.core.partitioners import (
     ColumnPartitioner,
@@ -17,6 +16,7 @@ from great_expectations.core.partitioners import (
     ColumnPartitionerYearly,
 )
 from great_expectations.datasource.fluent import BatchRequest
+from great_expectations.datasource.fluent.batch_identifier_util import make_batch_identifier
 from great_expectations.datasource.fluent.constants import _DATA_CONNECTOR_NAME
 from great_expectations.datasource.fluent.data_asset.path.dataframe_partitioners import (
     DataframePartitioner,
@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from great_expectations.datasource.fluent.data_connector.batch_filter import BatchSlice
 
 
+@public_api
 class DirectoryDataAsset(PathDataAsset[DatasourceT, ColumnPartitioner], Generic[DatasourceT], ABC):
     """Base class for PathDataAssets which batch by combining the contents of a directory."""
 
@@ -44,26 +45,62 @@ class DirectoryDataAsset(PathDataAsset[DatasourceT, ColumnPartitioner], Generic[
 
     @public_api
     def add_batch_definition_daily(self, name: str, column: str) -> BatchDefinition:
+        """
+        Add a BatchDefinition, which creates a single Batch for each day in the directory.
+
+        Args:
+            name: Name of the Batch Definition.
+            column: Column to partition on.
+
+        Returns:
+            A BatchDefinition that is partitioned daily.
+        """
         # todo: test column
         return self.add_batch_definition(
             name=name,
-            partitioner=ColumnPartitionerDaily(column_name=column),
+            partitioner=ColumnPartitionerDaily(
+                method_name="partition_on_year_and_month_and_day", column_name=column
+            ),
         )
 
     @public_api
     def add_batch_definition_monthly(self, name: str, column: str) -> BatchDefinition:
+        """
+        Add a BatchDefinition which creates a single batch for each month in the directory.
+
+        Args:
+            name: Name of the Batch Definition.
+            column: Column to partition on.
+
+        Returns:
+            A BatchDefinition that is partitioned monthly.
+        """
         # todo: test column
         return self.add_batch_definition(
             name=name,
-            partitioner=ColumnPartitionerMonthly(column_name=column),
+            partitioner=ColumnPartitionerMonthly(
+                method_name="partition_on_year_and_month", column_name=column
+            ),
         )
 
     @public_api
     def add_batch_definition_yearly(self, name: str, column: str) -> BatchDefinition:
+        """
+        Add a BatchDefinition which creates a single batch for each year in the directory.
+
+        Args:
+            name: Name of the Batch Definition.
+            column: Column to partition on.
+
+        Returns:
+            A BatchDefinition that is partitioned yearly.
+        """
         # todo: test column
         return self.add_batch_definition(
             name=name,
-            partitioner=ColumnPartitionerYearly(column_name=column),
+            partitioner=ColumnPartitionerYearly(
+                method_name="partition_on_year", column_name=column
+            ),
         )
 
     @public_api
@@ -94,7 +131,7 @@ class DirectoryDataAsset(PathDataAsset[DatasourceT, ColumnPartitioner], Generic[
                 datasource_name=self._data_connector.datasource_name,
                 data_connector_name=_DATA_CONNECTOR_NAME,
                 data_asset_name=self._data_connector.data_asset_name,
-                batch_identifiers=IDDict(batch_identifiers),
+                batch_identifiers=make_batch_identifier(batch_identifiers),
             )
             batch_definition_list = [batch_definition]
         else:
@@ -158,7 +195,7 @@ class DirectoryDataAsset(PathDataAsset[DatasourceT, ColumnPartitioner], Generic[
         ):
             allowed_keys = set(self.get_batch_parameters_keys(partitioner=partitioner))
             actual_keys = set(options.keys())
-            raise gx_exceptions.InvalidBatchRequestError(  # noqa: TRY003
+            raise gx_exceptions.InvalidBatchRequestError(  # noqa: TRY003 # FIXME CoP
                 "Batch parameters should only contain keys from the following set:\n"
                 f"{allowed_keys}\nbut your specified keys contain\n"
                 f"{actual_keys.difference(allowed_keys)}\nwhich is not valid.\n"
@@ -184,7 +221,7 @@ class DirectoryDataAsset(PathDataAsset[DatasourceT, ColumnPartitioner], Generic[
         """
         get_reader_options_include: set[str] | None = self._get_reader_options_include()
         if not get_reader_options_include:
-            # Set to None if empty set to include any additional `extra_kwargs` passed to `add_*_asset`  # noqa: E501
+            # Set to None if empty set to include any additional `extra_kwargs` passed to `add_*_asset`  # noqa: E501 # FIXME CoP
             get_reader_options_include = None
         batch_spec_options = {
             "reader_method": self._get_reader_method(),

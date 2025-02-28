@@ -6,7 +6,7 @@ import pathlib
 import shutil
 import unittest.mock
 from typing import Any, Callable, Dict, Optional, Union, cast
-from unittest.mock import Mock  # noqa: TID251
+from unittest.mock import Mock  # noqa: TID251 # FIXME CoP
 
 import pytest
 import requests
@@ -33,10 +33,10 @@ USAGE_STATISTICS_QA_URL = (
 
 @pytest.fixture()
 def data_context_without_config_variables_filepath_configured(tmp_path_factory):
-    # This data_context is *manually* created to have the config we want, vs created with DataContext.create  # noqa: E501
+    # This data_context is *manually* created to have the config we want, vs created with DataContext.create  # noqa: E501 # FIXME CoP
     project_path = str(tmp_path_factory.mktemp("data_context"))
-    context_path = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118
-    asset_config_path = os.path.join(context_path, "expectations")  # noqa: PTH118
+    context_path = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118 # FIXME CoP
+    asset_config_path = os.path.join(context_path, "expectations")  # noqa: PTH118 # FIXME CoP
 
     create_data_context_files(
         context_path,
@@ -52,10 +52,10 @@ def data_context_without_config_variables_filepath_configured(tmp_path_factory):
 def data_context_with_variables_in_config(tmp_path_factory, monkeypatch):
     monkeypatch.setenv("FOO", "BAR")
     monkeypatch.setenv("REPLACE_ME_ESCAPED_ENV", "ive_been_$--replaced")
-    # This data_context is *manually* created to have the config we want, vs created with DataContext.create  # noqa: E501
+    # This data_context is *manually* created to have the config we want, vs created with DataContext.create  # noqa: E501 # FIXME CoP
     project_path = str(tmp_path_factory.mktemp("data_context"))
-    context_path = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118
-    asset_config_path = os.path.join(context_path, "expectations")  # noqa: PTH118
+    context_path = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118 # FIXME CoP
+    asset_config_path = os.path.join(context_path, "expectations")  # noqa: PTH118 # FIXME CoP
 
     create_data_context_files(
         context_path,
@@ -74,47 +74,47 @@ def create_data_context_files(
     config_variables_fixture_filename=None,
 ):
     if config_variables_fixture_filename:
-        os.makedirs(context_path, exist_ok=True)  # noqa: PTH103
-        os.makedirs(  # noqa: PTH103
-            os.path.join(context_path, "uncommitted"),  # noqa: PTH118
+        os.makedirs(context_path, exist_ok=True)  # noqa: PTH103 # FIXME CoP
+        os.makedirs(  # noqa: PTH103 # FIXME CoP
+            os.path.join(context_path, "uncommitted"),  # noqa: PTH118 # FIXME CoP
             exist_ok=True,
         )
         copy_relative_path(
             f"../test_fixtures/{config_variables_fixture_filename}",
             str(
-                os.path.join(  # noqa: PTH118
+                os.path.join(  # noqa: PTH118 # FIXME CoP
                     context_path, "uncommitted/config_variables.yml"
                 )
             ),
         )
         copy_relative_path(
             f"../test_fixtures/{ge_config_fixture_filename}",
-            str(os.path.join(context_path, FileDataContext.GX_YML)),  # noqa: PTH118
+            str(os.path.join(context_path, FileDataContext.GX_YML)),  # noqa: PTH118 # FIXME CoP
         )
     else:
-        os.makedirs(context_path, exist_ok=True)  # noqa: PTH103
+        os.makedirs(context_path, exist_ok=True)  # noqa: PTH103 # FIXME CoP
         copy_relative_path(
             f"../test_fixtures/{ge_config_fixture_filename}",
-            str(os.path.join(context_path, FileDataContext.GX_YML)),  # noqa: PTH118
+            str(os.path.join(context_path, FileDataContext.GX_YML)),  # noqa: PTH118 # FIXME CoP
         )
     create_common_data_context_files(context_path, asset_config_path)
 
 
 def create_common_data_context_files(context_path, asset_config_path):
-    os.makedirs(  # noqa: PTH103
-        os.path.join(  # noqa: PTH118
+    os.makedirs(  # noqa: PTH103 # FIXME CoP
+        os.path.join(  # noqa: PTH118 # FIXME CoP
             asset_config_path, "mydatasource/mygenerator/my_dag_node"
         ),
         exist_ok=True,
     )
     copy_relative_path(
         "../test_fixtures/" "expectation_suites/parameterized_expectation_suite_fixture.json",
-        os.path.join(  # noqa: PTH118
+        os.path.join(  # noqa: PTH118 # FIXME CoP
             asset_config_path, "mydatasource/mygenerator/my_dag_node/default.json"
         ),
     )
-    os.makedirs(  # noqa: PTH103
-        os.path.join(context_path, "plugins"),  # noqa: PTH118
+    os.makedirs(  # noqa: PTH103 # FIXME CoP
+        os.path.join(context_path, "plugins"),  # noqa: PTH118 # FIXME CoP
         exist_ok=True,
     )
 
@@ -130,7 +130,6 @@ def basic_data_context_config():
             "commented_map": {},
             "config_version": 2,
             "plugins_directory": "plugins/",
-            "suite_parameter_store_name": "suite_parameter_store",
             "validation_results_store_name": "does_not_have_to_be_real",
             "expectations_store_name": "expectations_store",
             "checkpoint_store_name": "checkpoint_store",
@@ -149,10 +148,6 @@ def basic_data_context_config():
                         "class_name": "TupleFilesystemStoreBackend",
                         "base_directory": "checkpoints/",
                     },
-                },
-                "suite_parameter_store": {
-                    "module_name": "great_expectations.data_context.store",
-                    "class_name": "SuiteParameterStore",
                 },
             },
             "data_docs_sites": {},
@@ -189,7 +184,6 @@ def data_context_config_with_datasources(conn_string_password):
             "commented_map": {},
             "config_version": 2,
             "plugins_directory": "plugins/",
-            "suite_parameter_store_name": "suite_parameter_store",
             "validation_results_store_name": "does_not_have_to_be_real",
             "expectations_store_name": "expectations_store",
             "checkpoint_store_name": "checkpoint_store",
@@ -215,10 +209,6 @@ def data_context_config_with_datasources(conn_string_password):
                         "base_directory": "checkpoints/",
                     },
                 },
-                "suite_parameter_store": {
-                    "module_name": "great_expectations.data_context.store",
-                    "class_name": "SuiteParameterStore",
-                },
             },
             "data_docs_sites": {},
             "analytics_enabled": True,
@@ -241,7 +231,6 @@ def data_context_config_with_cloud_backed_stores(ge_cloud_access_token):
             "commented_map": {},
             "config_version": 2,
             "plugins_directory": "plugins/",
-            "suite_parameter_store_name": "suite_parameter_store",
             "validation_results_store_name": "does_not_have_to_be_real",
             "expectations_store_name": "expectations_store",
             "config_variables_file_path": "uncommitted/config_variables.yml",
@@ -259,7 +248,6 @@ def data_context_config_with_cloud_backed_stores(ge_cloud_access_token):
                         "suppress_store_backend_id": True,
                     },
                 },
-                "default_suite_parameter_store": {"class_name": "SuiteParameterStore"},
                 "default_expectations_store": {
                     "class_name": "ExpectationsStore",
                     "store_backend": {
@@ -361,7 +349,7 @@ class MockResponse:
         if self.status_code >= 400:
             raise requests.exceptions.HTTPError(f"Mock {self.status_code} HTTPError", response=self)
 
-    def __repr__(self):
+    def __repr__(self):  # type: ignore[explicit-override] # FIXME
         return f"<Response [{self.status_code}]>"
 
 

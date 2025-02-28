@@ -39,7 +39,7 @@ with warnings.catch_warnings():
 
 # Python
 # <snippet name="docs/docusaurus/docs/oss/guides/connecting_to_your_data/fluent/database/how_to_connect_to_sql_data_using_a_query.py datasource">
-datasource = context.get_datasource("my_datasource")
+datasource = context.data_sources.get("my_datasource")
 # </snippet>
 
 # Python
@@ -56,9 +56,8 @@ my_asset = datasource.get_asset("my_asset")
 assert my_asset
 
 my_batch_request = my_asset.build_batch_request()
-batches = my_asset.get_batch_list_from_batch_request(my_batch_request)
-assert len(batches) == 1
-assert set(batches[0].columns()) == {
+batch = my_asset.get_batch(my_batch_request)
+assert set(batch.columns()) == {
     "passenger_count",
     "total_amount",
 }

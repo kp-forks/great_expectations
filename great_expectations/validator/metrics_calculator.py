@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Hashable
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from great_expectations._docs_decorators import public_api
+from great_expectations.metrics.metric_results import MetricErrorResultValue
 from great_expectations.validator.computed_metric import MetricValue
-from great_expectations.validator.exception_info import ExceptionInfo
-from great_expectations.validator.metric_configuration import MetricConfiguration
+from great_expectations.validator.metric_configuration import (
+    MetricConfiguration,
+    MetricConfigurationID,
+)
 from great_expectations.validator.validation_graph import ValidationGraph
 
 if TYPE_CHECKING:
@@ -20,11 +21,10 @@ logger = logging.getLogger(__name__)
 logging.captureWarnings(True)
 
 
-_MetricKey: TypeAlias = Union[Tuple[str, Hashable, Hashable], Tuple[str, str, str]]
-_MetricsDict: TypeAlias = Dict[_MetricKey, MetricValue]
+_MetricsDict: TypeAlias = Dict[MetricConfigurationID, MetricValue]
 _AbortedMetricsInfoDict: TypeAlias = Dict[
-    _MetricKey,
-    Dict[str, Union[MetricConfiguration, ExceptionInfo, int]],
+    MetricConfigurationID,
+    MetricErrorResultValue,
 ]
 
 
@@ -52,7 +52,6 @@ class MetricsCalculator:
     def show_progress_bars(self, enable: bool) -> None:
         self._show_progress_bars = enable
 
-    @public_api
     def columns(self, domain_kwargs: Optional[Dict[str, Any]] = None) -> List[str]:
         """
         Convenience method to run "table.columns" metric.
@@ -78,7 +77,6 @@ class MetricsCalculator:
 
         return columns
 
-    @public_api
     def head(
         self,
         n_rows: int = 5,
@@ -133,7 +131,7 @@ class MetricsCalculator:
 
         Returns:
             Return Dictionary with requested metrics resolved, with metric_name as key and computed metric as value.
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         resolved_metrics: _MetricsDict
         resolved_metrics, _ = self.compute_metrics(
             metric_configurations=list(metrics.values()),
@@ -162,7 +160,7 @@ class MetricsCalculator:
             Tuple of two elements, the first is a dictionary with requested metrics resolved,
             with unique metric ID as key and computed metric as value. The second is a dictionary of the
             aborted metrics information, with metric ID as key if any metrics were aborted.
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         graph: ValidationGraph = self.build_metric_dependency_graph(
             metric_configurations=metric_configurations,
             runtime_configuration=runtime_configuration,
@@ -194,7 +192,7 @@ class MetricsCalculator:
 
         Returns:
             Resulting "ValidationGraph" object.
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         graph: ValidationGraph = ValidationGraph(execution_engine=self._execution_engine)
 
         metric_configuration: MetricConfiguration
@@ -222,7 +220,7 @@ class MetricsCalculator:
         Returns:
             Dictionary with requested metrics resolved, with unique metric ID as key and computed metric as value.
             Dictionary with aborted metrics information, with metric ID as key.
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         resolved_metrics: _MetricsDict
         aborted_metrics_info: _AbortedMetricsInfoDict
         (
@@ -262,7 +260,7 @@ class MetricsCalculator:
         Returns:
             Dictionary with requested metrics resolved, with unique metric ID as key and computed metric as value.
             Dictionary with aborted metrics information, with metric ID as key.
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         resolved_metrics: _MetricsDict
         aborted_metrics_info: _AbortedMetricsInfoDict
         resolved_metrics, aborted_metrics_info = graph.resolve(

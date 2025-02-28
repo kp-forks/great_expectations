@@ -18,7 +18,7 @@ def make_store_get(data_file_name, data_dir, with_slack):
         # key is a 3-tuple with the form
         # (GXCloudRESTResource, cloud_id as a string uuid, name as string)
         # For example:
-        # (<GXCloudRESTResource.CHECKPOINT: 'checkpoint'>, '731dc2a5-45d8-4827-9118-39b77c5cd413', 'my_checkpoint')  # noqa: E501
+        # (<GXCloudRESTResource.CHECKPOINT: 'checkpoint'>, '731dc2a5-45d8-4827-9118-39b77c5cd413', 'my_checkpoint')  # noqa: E501 # FIXME CoP
         type_ = key[0]
         if type_ == GXCloudRESTResource.CHECKPOINT:
             return {"data": _checkpoint_config(data_file_name, with_slack)}
@@ -44,7 +44,7 @@ def store_set(self, key, value, **kwargs):
                 "created_by_id": "934e0898-6a5c-4ffd-9125-89381a46d191",
                 "organization_id": org_id,
                 "validation_result": {
-                    "display_url": f"{base_url}{org_id}/?validationResultId=2e13ecc3-eaaa-444b-b30d-2f616f80ae35",  # noqa: E501
+                    "display_url": f"{base_url}{org_id}/?validationResultId=2e13ecc3-eaaa-444b-b30d-2f616f80ae35",  # noqa: E501 # FIXME CoP
                 },
             }
         }
@@ -101,7 +101,6 @@ def _cloud_config(data_dir):
         "config_variables_file_path": "uncommitted/config_variables.yml",
         "config_version": 3.0,
         "data_docs_sites": {},
-        "suite_parameter_store_name": "suite_parameter_store",
         "expectations_store_name": "default_expectations_store",
         "plugins_directory": "plugins/",
         "progress_bars": {
@@ -123,7 +122,6 @@ def _cloud_config(data_dir):
                     "suppress_store_backend_id": True,
                 },
             },
-            "default_suite_parameter_store": {"class_name": "SuiteParameterStore"},
             "default_expectations_store": {
                 "class_name": "ExpectationsStore",
                 "store_backend": {
@@ -149,10 +147,6 @@ def _cloud_config(data_dir):
                     "ge_cloud_resource_type": "validation_result",
                     "suppress_store_backend_id": True,
                 },
-            },
-            "suite_parameter_store": {
-                "class_name": "SuiteParameterStore",
-                "module_name": "great_expectations.data_context.store",
             },
             "expectations_store": {
                 "class_name": "ExpectationsStore",
@@ -262,7 +256,7 @@ def _datasource(data_dir):
                                 "taxi_data": {
                                     "batch_identifiers": ["runtime_batch_identifier_name"],
                                     "class_name": "Asset",
-                                    "module_name": "great_expectations.datasource.data_connector.asset",  # noqa: E501
+                                    "module_name": "great_expectations.datasource.data_connector.asset",  # noqa: E501 # FIXME CoP
                                 }
                             },
                             "class_name": "RuntimeDataConnector",

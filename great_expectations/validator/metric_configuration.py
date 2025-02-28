@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 import json
-from typing import Optional, Tuple, Union
+from typing import NamedTuple, Optional, Union
 
-from great_expectations._docs_decorators import public_api
+from great_expectations.compatibility.typing_extensions import override
 from great_expectations.core.domain import Domain
-from great_expectations.core.id_dict import IDDict
+from great_expectations.core.id_dict import IDDict, IDDictID
 from great_expectations.core.metric_domain_types import MetricDomainTypes
 from great_expectations.experimental.metric_repository.metrics import MetricTypes
-from great_expectations.util import convert_to_json_serializable  # noqa: TID251
+from great_expectations.util import convert_to_json_serializable  # noqa: TID251 # FIXME CoP
 
 
-@public_api
+class MetricConfigurationID(NamedTuple):
+    metric_name: str
+    metric_domain_kwargs_id: IDDictID
+    metric_value_kwargs_id: IDDictID
+
+
 class MetricConfiguration:
     """An interface for configuring Metrics.
 
@@ -26,7 +31,7 @@ class MetricConfiguration:
         metric_value_kwargs (optional[dict]): Optional kwargs that define values specific to each Metric.  For instance,
             a Metric that partitions a column can define the method of partitioning (`uniform` bins) and the number of
             bins (`n_bins`) as `metric_value_kwargs`.
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     def __init__(
         self,
@@ -36,7 +41,6 @@ class MetricConfiguration:
     ) -> None:
         if isinstance(metric_name, MetricTypes):
             metric_name = metric_name.value
-        self._metric_name = metric_name
 
         if not isinstance(metric_domain_kwargs, IDDict):
             metric_domain_kwargs = IDDict(metric_domain_kwargs)
@@ -52,15 +56,22 @@ class MetricConfiguration:
 
         self._metric_dependencies: IDDict = IDDict({})
 
-    def __repr__(self):
+        self._id = MetricConfigurationID(
+            metric_name,
+            metric_domain_kwargs.to_id(),
+            metric_value_kwargs.to_id(),
+        )
+
+    def __repr__(self):  # type: ignore[explicit-override] # FIXME
         return json.dumps(self.to_json_dict(), indent=2)
 
+    @override
     def __str__(self):
         return self.__repr__()
 
     @property
     def metric_name(self) -> str:
-        return self._metric_name
+        return self.id.metric_name
 
     @property
     def metric_domain_kwargs(self) -> IDDict:
@@ -71,12 +82,12 @@ class MetricConfiguration:
         return self._metric_value_kwargs
 
     @property
-    def metric_domain_kwargs_id(self) -> str:
-        return self.metric_domain_kwargs.to_id()
+    def metric_domain_kwargs_id(self) -> IDDictID:
+        return self.id.metric_domain_kwargs_id
 
     @property
-    def metric_value_kwargs_id(self) -> str:
-        return self.metric_value_kwargs.to_id()
+    def metric_value_kwargs_id(self) -> IDDictID:
+        return self.id.metric_value_kwargs_id
 
     @property
     def metric_dependencies(self) -> IDDict:
@@ -135,7 +146,7 @@ class MetricConfiguration:
                 },
             )
 
-        raise ValueError(f"""Domain type "{domain_type}" is not recognized.""")  # noqa: TRY003
+        raise ValueError(f"""Domain type "{domain_type}" is not recognized.""")  # noqa: TRY003 # FIXME CoP
 
     def get_domain_type(self) -> MetricDomainTypes:
         """Return "domain_type" of this "MetricConfiguration" object."""
@@ -148,18 +159,13 @@ class MetricConfiguration:
         if "column_list" in self._metric_domain_kwargs:
             return MetricDomainTypes.MULTICOLUMN
 
-        # TODO: <Alex>Determining "domain_type" of "MetricConfiguration" using heuristics defaults to "TABLE".</Alex>  # noqa: E501
+        # TODO: <Alex>Determining "domain_type" of "MetricConfiguration" using heuristics defaults to "TABLE".</Alex>  # noqa: E501 # FIXME CoP
         return MetricDomainTypes.TABLE
 
     @property
-    def id(self) -> Tuple[str, str, str]:
-        return (
-            self.metric_name,
-            self.metric_domain_kwargs_id,
-            self.metric_value_kwargs_id,
-        )
+    def id(self) -> MetricConfigurationID:
+        return self._id
 
-    @public_api
     def to_json_dict(self) -> dict:
         """Returns a JSON-serializable dict representation of this MetricConfiguration.
 

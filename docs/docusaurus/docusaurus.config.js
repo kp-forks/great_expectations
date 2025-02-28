@@ -34,29 +34,37 @@ module.exports = {
       async: true,
       defer: true,
     },
+    {
+      src: '/scripts/web-tracking.js',
+      async: true
+    },
+    {
+      src: 'https://fast.wistia.net/assets/external/E-v1.js',
+      async: true
+    }
   ],
 
   themeConfig: {
     announcementBar: {
       id: 'cta_bar',
       content:
-        '<a style="font-weight:600" href="https://hubs.li/Q02nK_ZH0">Get started with GX Cloud by joining our bi-weekly hands on workshop.</a>',
+          '<a style="font-weight:600" href="https://hubs.li/Q02nK_ZH0">Get started with GX Cloud by joining our bi-weekly hands on workshop.</a>',
       backgroundColor: '#141432',
       textColor: '#fff',
-      isCloseable: true,
+      isCloseable: false,
     },
     gxCard: {
       title: 'What is GX Cloud?',
       description:
-        'GX Cloud is a fully-managed SaaS solution that simplifies deployment, scaling, and collaboration and lets you focus on data validation.',
+        'GX Cloud is a fully-managed SaaS solution that simplifies deployment, scaling, and collaboration—so you can focus on data validation.',
       buttons: {
         primary: {
-          label: 'Try GX Cloud',
-          href: 'https://greatexpectations.io/cloud',
+          label: 'Request a demo',
+          href: 'https://greatexpectations.io/demo',
         },
         secondary: {
           label: 'Why GX Cloud?',
-          href: 'https://docs.greatexpectations.io/docs/cloud/why_gx_cloud',
+          href: 'https://greatexpectations.io/why-gx-cloud',
         },
       },
     },
@@ -67,17 +75,31 @@ module.exports = {
     },
     algolia: {
       // See: https://docusaurus.io/docs/search#connecting-algolia
-      appId: 'PFK639M3JK',
-      apiKey: 'fc3e3b1588b46d8d476aca9c1cadd53f',
+      // Algolia apiKey is stored on Netlify's ENV variables
+      appId: config.parsed.ALGOLIA_ID || 'PFK639M3JK',
+      apiKey: config.parsed.ALGOLIA_API_KEY || '0d1a1d5150b166e798933d41988094c9',
       indexName: 'greatexpectations',
       searchPagePath: 'search',
       contextualSearch: true,
     },
     prism: {
+      additionalLanguages: ['bash', 'json', 'python', 'yaml'],
       theme: require('./src/theme/CodeBlock/theme'),
+      magicComments: [
+        // Remember to extend the default highlight class name as well!
+        {
+          className: 'theme-code-block-highlighted-line',
+          line: 'highlight-next-line',
+          block: {start: 'highlight-start', end: 'highlight-end'},
+        },
+        {
+          className: 'code-block-hide-line',
+          line: 'Hide this',
+        },
+      ]
     },
     colorMode: {
-      disableSwitch: true,
+      disableSwitch: false,
     },
     zoomSelector: '.markdown :not(em) > img',
     // announcementBar: {
@@ -94,6 +116,7 @@ module.exports = {
       logo: {
         alt: 'Great Expectations',
         src: 'img/GXDocs.svg',
+        srcDark: 'img/GXDocs-dark.svg',
         href: 'https://greatexpectations.io',
       },
       items: [
@@ -115,6 +138,11 @@ module.exports = {
           className: 'custom-search-bar',
         },
         {
+          type: 'custom-colorModeToggle',
+          position: 'left',
+          className: 'color-mode-toggle',
+        },
+        {
           type: 'custom-githubNavbarItem',
           position: 'left',
           owner: 'great-expectations',
@@ -129,14 +157,15 @@ module.exports = {
         },
         {
           label: 'GX Cloud',
-          to: 'docs/cloud',
+          to: 'docs/cloud/overview/gx_cloud_overview',
           position: 'right',
           className: 'non-versioned-section',
+          activeBaseRegex: `/cloud/`
         },
         {
           type: 'doc',
-          label: 'GX OSS',
-          docId: 'oss/oss',
+          label: 'GX Core',
+          docId: 'core/introduction/introduction',
           position: 'right',
         },
         {
@@ -161,16 +190,24 @@ module.exports = {
           label: 'Resources',
           items: [
             {
+              type: 'doc',
               label: 'Get support',
-              to: '/docs/resources/get_support',
+              docId: 'resources/get_support',
+              className: 'non-versioned-section',
             },
             {
+              type: 'doc',
               label: 'Integration support policy',
-              to: '/docs/application_integration_support',
+              docId: 'application_integration_support',
+              className: 'non-versioned-section',
             },
             {
               label: 'Community',
               to: 'https://greatexpectations.io/community',
+            },
+            {
+              label: 'Request a demo',
+              to: 'https://greatexpectations.io/demo-gx-cloud',
             },
           ],
           position: 'right',
@@ -202,7 +239,7 @@ module.exports = {
               to: 'https://greatexpectations.io/gx-cloud',
             },
             {
-              label: 'GX OSS',
+              label: 'GX Core',
               to: 'https://greatexpectations.io/gx-oss',
             },
             {
@@ -268,14 +305,13 @@ module.exports = {
           // Note: remarkCodeImport is included to handle earlier versions with line number references (e.g. v0.14.13)
           remarkPlugins: [remarkNamedSnippets, remarkCodeImport],
           // versions needs to map major.minor -> major.minor.patch for display purposes. Update the patch as needed.
+          lastVersion: 'current',
           versions: {
             current: {
-              label: '1.0 prerelease',
-              path: '1.0-prerelease',
+              label: '1.3.8',
             },
             ['0.18']: {
-              label: '0.18.17',
-              path: '',
+              label: '0.18.21',
             },
           },
           admonitions: {
@@ -299,6 +335,12 @@ module.exports = {
           // Optional fields.
           anonymizeIP: true, // Should IPs be anonymized?
         },
+        sitemap: {
+          ignorePatterns: [
+            '**/0.18/oss/templates/**',
+            '**/0.18/oss/team_templates/**'
+          ],
+        }
       },
     ],
   ],

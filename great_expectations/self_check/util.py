@@ -50,12 +50,12 @@ from great_expectations.core import (
     ExpectationSuiteSchema,
     ExpectationSuiteValidationResultSchema,
     ExpectationValidationResultSchema,
-    IDDict,
 )
 from great_expectations.core.batch import Batch, LegacyBatchDefinition
 from great_expectations.core.util import (
     get_sql_dialect_floating_point_infinity_value,
 )
+from great_expectations.datasource.fluent.batch_identifier_util import make_batch_identifier
 from great_expectations.exceptions.exceptions import (
     ExecutionEngineError,
     InvalidExpectationConfigurationError,
@@ -125,18 +125,37 @@ else:
 
 
 from great_expectations.compatibility.bigquery import (
-    BIGQUERY_TYPES,
     GEOGRAPHY,
+    sqlalchemy_bigquery,
 )
 
-if GEOGRAPHY:
-    BIGQUERY_TYPES["GEOGRAPHY"] = GEOGRAPHY
+try:
+    BIGQUERY_TYPES = {
+        "INTEGER": sqlalchemy_bigquery.INTEGER,
+        "NUMERIC": sqlalchemy_bigquery.NUMERIC,
+        "STRING": sqlalchemy_bigquery.STRING,
+        "BIGNUMERIC": sqlalchemy_bigquery.BIGNUMERIC,
+        "BYTES": sqlalchemy_bigquery.BYTES,
+        "BOOL": sqlalchemy_bigquery.BOOL,
+        "BOOLEAN": sqlalchemy_bigquery.BOOLEAN,
+        "TIMESTAMP": sqlalchemy_bigquery.TIMESTAMP,
+        "TIME": sqlalchemy_bigquery.TIME,
+        "FLOAT": sqlalchemy_bigquery.FLOAT,
+        "DATE": sqlalchemy_bigquery.DATE,
+        "DATETIME": sqlalchemy_bigquery.DATETIME,
+    }
+
+    if GEOGRAPHY:
+        BIGQUERY_TYPES["GEOGRAPHY"] = GEOGRAPHY
+
+except (ImportError, AttributeError):
+    BIGQUERY_TYPES = {}
 
 try:
-    import sqlalchemy.dialects.postgresql as postgresqltypes  # noqa: TID251
+    import sqlalchemy.dialects.postgresql as postgresqltypes  # noqa: TID251 # FIXME CoP
 
     # noinspection PyPep8Naming
-    from sqlalchemy.dialects.postgresql import dialect as pgDialect  # noqa: TID251
+    from sqlalchemy.dialects.postgresql import dialect as pgDialect  # noqa: TID251 # FIXME CoP
 
     POSTGRESQL_TYPES = {
         "TEXT": postgresqltypes.TEXT,
@@ -151,15 +170,15 @@ try:
         "NUMERIC": postgresqltypes.NUMERIC,
     }
 except (ImportError, KeyError):
-    postgresqltypes = None
-    pgDialect = None
+    postgresqltypes = None  # type: ignore[assignment] # FIXME CoP
+    pgDialect = None  # type: ignore[assignment] # FIXME CoP
     POSTGRESQL_TYPES = {}
 
 try:
-    import sqlalchemy.dialects.mysql as mysqltypes  # noqa: TID251
+    import sqlalchemy.dialects.mysql as mysqltypes  # noqa: TID251 # FIXME CoP
 
     # noinspection PyPep8Naming
-    from sqlalchemy.dialects.mysql import dialect as mysqlDialect  # noqa: TID251
+    from sqlalchemy.dialects.mysql import dialect as mysqlDialect  # noqa: TID251 # FIXME CoP
 
     MYSQL_TYPES = {
         "TEXT": mysqltypes.TEXT,
@@ -176,22 +195,22 @@ try:
         "TINYINT": mysqltypes.TINYINT,
     }
 except (ImportError, KeyError):
-    mysqltypes = None
-    mysqlDialect = None
+    mysqltypes = None  # type: ignore[assignment] # FIXME CoP
+    mysqlDialect = None  # type: ignore[assignment] # FIXME CoP
     MYSQL_TYPES = {}
 
 try:
-    # SQLAlchemy does not export the "INT" type for the MS SQL Server dialect; however "INT" is supported by the engine.  # noqa: E501
-    # Since SQLAlchemy exports the "INTEGER" type for the MS SQL Server dialect, alias "INT" to the "INTEGER" type.  # noqa: E501
-    import sqlalchemy.dialects.mssql as mssqltypes  # noqa: TID251
+    # SQLAlchemy does not export the "INT" type for the MS SQL Server dialect; however "INT" is supported by the engine.  # noqa: E501 # FIXME CoP
+    # Since SQLAlchemy exports the "INTEGER" type for the MS SQL Server dialect, alias "INT" to the "INTEGER" type.  # noqa: E501 # FIXME CoP
+    import sqlalchemy.dialects.mssql as mssqltypes  # noqa: TID251 # FIXME CoP
 
     # noinspection PyPep8Naming
-    from sqlalchemy.dialects.mssql import dialect as mssqlDialect  # noqa: TID251
+    from sqlalchemy.dialects.mssql import dialect as mssqlDialect  # noqa: TID251 # FIXME CoP
 
     try:
-        mssqltypes.INT  # noqa: B018 # reassigning if attr not found
+        mssqltypes.INT  # type: ignore[attr-defined] # noqa: B018 # reassigning if attr not found
     except AttributeError:
-        mssqltypes.INT = mssqltypes.INTEGER
+        mssqltypes.INT = mssqltypes.INTEGER  # type: ignore[attr-defined] # FIXME CoP
 
     # noinspection PyUnresolvedReferences
     MSSQL_TYPES = {
@@ -206,7 +225,7 @@ try:
         "DECIMAL": mssqltypes.DECIMAL,
         "FLOAT": mssqltypes.FLOAT,
         "IMAGE": mssqltypes.IMAGE,
-        "INT": mssqltypes.INT,
+        "INT": mssqltypes.INT,  # type: ignore[attr-defined] # FIXME CoP
         "INTEGER": mssqltypes.INTEGER,
         "MONEY": mssqltypes.MONEY,
         "NCHAR": mssqltypes.NCHAR,
@@ -227,8 +246,8 @@ try:
         "VARCHAR": mssqltypes.VARCHAR,
     }
 except (ImportError, KeyError):
-    mssqltypes = None
-    mssqlDialect = None
+    mssqltypes = None  # type: ignore[assignment] # FIXME CoP
+    mssqlDialect = None  # type: ignore[assignment] # FIXME CoP
     MSSQL_TYPES = {}
 
 
@@ -325,7 +344,7 @@ REDSHIFT_TYPES: Dict[str, Any] = (
 
 SNOWFLAKE_TYPES: Dict[str, Any]
 if snowflake.snowflakesqlalchemy and snowflake.snowflakedialect and snowflake.snowflaketypes:
-    # Sometimes "snowflake-sqlalchemy" fails to self-register in certain environments, so we do it explicitly.  # noqa: E501
+    # Sometimes "snowflake-sqlalchemy" fails to self-register in certain environments, so we do it explicitly.  # noqa: E501 # FIXME CoP
     # (see https://stackoverflow.com/questions/53284762/nosuchmoduleerror-cant-load-plugin-sqlalchemy-dialectssnowflake)
     sqlalchemy.dialects.registry.register("snowflake", "snowflake.sqlalchemy", "dialect")
 
@@ -440,7 +459,7 @@ def get_sqlite_connection_url(sqlite_db_path):
     return url
 
 
-def get_test_validator_with_data(  # noqa: PLR0913
+def get_test_validator_with_data(  # noqa: PLR0913 # FIXME CoP
     execution_engine: str,
     data: dict,
     table_name: str | None = None,
@@ -489,10 +508,10 @@ def get_test_validator_with_data(  # noqa: PLR0913
             pk_column=pk_column,
         )
     else:
-        raise ValueError(f"Unknown dataset_type {execution_engine!s}")  # noqa: TRY003
+        raise ValueError(f"Unknown dataset_type {execution_engine!s}")  # noqa: TRY003 # FIXME CoP
 
 
-def _get_test_validator_with_data_pandas(  # noqa: C901
+def _get_test_validator_with_data_pandas(  # noqa: C901 # FIXME CoP
     df: pd.DataFrame,
     schemas: dict | None,
     table_name: str | None,
@@ -505,8 +524,8 @@ def _get_test_validator_with_data_pandas(  # noqa: C901
             schema["pk_index"] = "int"
         pandas_schema = {}
         for key, value in schema.items():
-            # Note, these are just names used in our internal schemas to build datasets *for internal tests*  # noqa: E501
-            # Further, some changes in pandas internal about how datetimes are created means to support pandas  # noqa: E501
+            # Note, these are just names used in our internal schemas to build datasets *for internal tests*  # noqa: E501 # FIXME CoP
+            # Further, some changes in pandas internal about how datetimes are created means to support pandas  # noqa: E501 # FIXME CoP
             # pre- 0.25, we need to explicitly specify when we want timezone.
 
             # We will use timestamp for timezone-aware (UTC only) dates in our tests
@@ -518,7 +537,7 @@ def _get_test_validator_with_data_pandas(  # noqa: C901
                 continue
             elif value.lower() in ["date"]:
                 df[key] = execute_pandas_to_datetime(df[key]).dt.date
-                value = "object"  # noqa: PLW2901
+                value = "object"  # noqa: PLW2901 # FIXME CoP
             try:
                 type_ = np.dtype(value)
             except TypeError:
@@ -536,7 +555,7 @@ def _get_test_validator_with_data_pandas(  # noqa: C901
         datasource_name="pandas_datasource",
         data_connector_name="runtime_data_connector",
         data_asset_name="my_asset",
-        batch_identifiers=IDDict({}),
+        batch_identifiers=make_batch_identifier({}),
         batch_spec_passthrough=None,
     )
 
@@ -545,7 +564,7 @@ def _get_test_validator_with_data_pandas(  # noqa: C901
     )
 
 
-def _get_test_validator_with_data_sqlalchemy(  # noqa: PLR0913
+def _get_test_validator_with_data_sqlalchemy(  # noqa: PLR0913 # FIXME CoP
     df: pd.DataFrame,
     execution_engine: str,
     schemas: dict | None,
@@ -561,8 +580,8 @@ def _get_test_validator_with_data_sqlalchemy(  # noqa: PLR0913
         return None
 
     if table_name is None:
-        raise ExecutionEngineError(  # noqa: TRY003
-            "Initializing a Validator for SqlAlchemyExecutionEngine in tests requires `table_name` to be defined. Please check your configuration"  # noqa: E501
+        raise ExecutionEngineError(  # noqa: TRY003 # FIXME CoP
+            "Initializing a Validator for SqlAlchemyExecutionEngine in tests requires `table_name` to be defined. Please check your configuration"  # noqa: E501 # FIXME CoP
         )
     return build_sa_validator_with_data(
         df=df,
@@ -579,7 +598,7 @@ def _get_test_validator_with_data_sqlalchemy(  # noqa: PLR0913
     )
 
 
-def _get_test_validator_with_data_spark(  # noqa: C901, PLR0912, PLR0915
+def _get_test_validator_with_data_spark(  # noqa: C901, PLR0912, PLR0915 # FIXME CoP
     data: dict,
     schemas: dict | None,
     context: AbstractDataContext | None,
@@ -601,7 +620,7 @@ def _get_test_validator_with_data_spark(  # noqa: C901, PLR0912, PLR0915
     }
 
     spark = SparkDFExecutionEngine.get_or_create_spark_session()
-    # We need to allow null values in some column types that do not support them natively, so we skip  # noqa: E501
+    # We need to allow null values in some column types that do not support them natively, so we skip  # noqa: E501 # FIXME CoP
     # use of df in this case.
     data_reshaped = list(zip(*(v for _, v in data.items())))  # create a list of rows
     if schemas and "spark" in schemas:
@@ -653,7 +672,7 @@ def _get_test_validator_with_data_spark(  # noqa: C901, PLR0912, PLR0915
                         if val is None:
                             vals.append(val)
                         else:
-                            vals.append(parse(val))  # type: ignore[arg-type]
+                            vals.append(parse(val))  # type: ignore[arg-type] # FIXME CoP
                     data[col] = vals
             # Do this again, now that we have done type conversion using the provided schema
             data_reshaped = list(zip(*(v for _, v in data.items())))  # create a list of rows
@@ -681,7 +700,7 @@ def _get_test_validator_with_data_spark(  # noqa: C901, PLR0912, PLR0915
         datasource_name="spark_datasource",
         data_connector_name="runtime_data_connector",
         data_asset_name="my_asset",
-        batch_identifiers=IDDict({}),
+        batch_identifiers=make_batch_identifier({}),
         batch_spec_passthrough=None,
     )
     return build_spark_validator_with_data(
@@ -697,7 +716,7 @@ def build_pandas_validator_with_data(
     batch_definition: Optional[LegacyBatchDefinition] = None,
     context: Optional[AbstractDataContext] = None,
 ) -> Validator:
-    batch = Batch(data=df, batch_definition=batch_definition)  # type: ignore[arg-type]
+    batch = Batch(data=df, batch_definition=batch_definition)  # type: ignore[arg-type] # FIXME CoP
 
     if context is None:
         context = build_in_memory_runtime_context()
@@ -711,7 +730,7 @@ def build_pandas_validator_with_data(
     )
 
 
-def build_sa_validator_with_data(  # noqa: C901, PLR0912, PLR0913, PLR0915
+def build_sa_validator_with_data(  # noqa: C901, PLR0912, PLR0913, PLR0915 # FIXME CoP
     df,
     sa_engine_name,
     table_name,
@@ -724,9 +743,9 @@ def build_sa_validator_with_data(  # noqa: C901, PLR0912, PLR0913, PLR0915
     context: Optional[AbstractDataContext] = None,
     pk_column: bool = False,
 ):
-    _debug = lambda x: x  # noqa: E731
+    _debug = lambda x: x  # noqa: E731 # FIXME CoP
     if debug_logger:
-        _debug = lambda x: debug_logger.debug(  # noqa: E731
+        _debug = lambda x: debug_logger.debug(  # noqa: E731 # FIXME CoP
             f"(build_sa_validator_with_data) {x}"
         )
 
@@ -740,13 +759,13 @@ def build_sa_validator_with_data(  # noqa: C901, PLR0912, PLR0913, PLR0915
 
     try:
         dialect_classes["postgresql"] = postgresqltypes.dialect
-        dialect_types["postgresql"] = POSTGRESQL_TYPES
+        dialect_types["postgresql"] = POSTGRESQL_TYPES  # type: ignore[assignment] # FIXME CoP
     except AttributeError:
         pass
 
     try:
         dialect_classes["mysql"] = mysqltypes.dialect
-        dialect_types["mysql"] = MYSQL_TYPES
+        dialect_types["mysql"] = MYSQL_TYPES  # type: ignore[assignment] # FIXME CoP
     except AttributeError:
         pass
 
@@ -757,7 +776,7 @@ def build_sa_validator_with_data(  # noqa: C901, PLR0912, PLR0913, PLR0915
         pass
 
     try:
-        dialect_classes["bigquery"] = BigQueryDialect  # type: ignore[assignment]
+        dialect_classes["bigquery"] = BigQueryDialect  # type: ignore[assignment] # FIXME CoP
         dialect_types["bigquery"] = BIGQUERY_TYPES
     except AttributeError:
         pass
@@ -800,11 +819,12 @@ def build_sa_validator_with_data(  # noqa: C901, PLR0912, PLR0913, PLR0915
         connection_string = f"mysql+pymysql://root@{db_hostname}/test_ci"
         engine = sa.create_engine(connection_string)
     elif sa_engine_name == "mssql":
-        connection_string = f"mssql+pyodbc://sa:ReallyStrongPwd1234%^&*@{db_hostname}:1433/test_ci?driver=ODBC Driver 17 for SQL Server&charset=utf8&autocommit=true"  # noqa: E501
-        engine = sa.create_engine(
-            connection_string,
-            # echo=True,
+        connection_string = (
+            "mssql+pyodbc://sa:ReallyStrongPwd1234%^&*@127.0.0.1:1433/test_ci"
+            "?driver=ODBC Driver 18 for SQL Server&charset=utf8"
+            "&autocommit=true&TrustServerCertificate=yes"
         )
+        engine = sa.create_engine(connection_string)
     elif sa_engine_name == "bigquery":
         connection_string = _get_bigquery_connection_string()
         engine = sa.create_engine(connection_string)
@@ -827,8 +847,8 @@ def build_sa_validator_with_data(  # noqa: C901, PLR0912, PLR0913, PLR0915
         connection_string = None
         engine = None
 
-    # If "autocommit" is not desired to be on by default, then use the following pattern when explicit "autocommit"  # noqa: E501
-    # is desired (e.g., for temporary tables, "autocommit" is off by default, so the override option may be useful).  # noqa: E501
+    # If "autocommit" is not desired to be on by default, then use the following pattern when explicit "autocommit"  # noqa: E501 # FIXME CoP
+    # is desired (e.g., for temporary tables, "autocommit" is off by default, so the override option may be useful).  # noqa: E501 # FIXME CoP
     # execution_engine.execute_query(sa.text(sql_query_string).execution_options(autocommit=True))
 
     # Add the data to the database as a new table
@@ -841,7 +861,7 @@ def build_sa_validator_with_data(  # noqa: C901, PLR0912, PLR0913, PLR0915
     if (
         schemas
         and sa_engine_name in schemas
-        and isinstance(engine.dialect, dialect_classes[sa_engine_name])
+        and isinstance(engine.dialect, dialect_classes[sa_engine_name])  # type: ignore[union-attr] # FIXME CoP
     ):
         schema = schemas[sa_engine_name]
         if pk_column:
@@ -918,7 +938,7 @@ def build_sa_validator_with_data(  # noqa: C901, PLR0912, PLR0913, PLR0915
             datasource_name="my_test_datasource",
             data_connector_name="my_sql_data_connector",
             data_asset_name="my_asset",
-            batch_identifiers=IDDict(),
+            batch_identifiers=make_batch_identifier({}),
         )
 
     batch = Batch(data=batch_data, batch_definition=batch_definition)  # type: ignore[arg-type] # got SqlAlchemyBatchData
@@ -942,8 +962,6 @@ def modify_locale(func: Callable[P, None]) -> Callable[P, None]:
             new_locale = locale.setlocale(locale.LC_TIME, "en_US.UTF-8")
             assert new_locale == "en_US.UTF-8"
             func(*args, **kwargs)
-        except Exception:  # noqa: TRY302
-            raise
         finally:
             locale.setlocale(locale.LC_TIME, old_locale)
 
@@ -990,12 +1008,12 @@ def build_spark_validator_with_data(
 def build_pandas_engine(
     df: pd.DataFrame,
 ) -> PandasExecutionEngine:
-    batch = Batch(data=df)  # type: ignore[arg-type]
+    batch = Batch(data=df)  # type: ignore[arg-type] # FIXME CoP
     execution_engine = PandasExecutionEngine(batch_data_dict={batch.id: batch.data})
     return execution_engine
 
 
-def build_sa_execution_engine(  # noqa: PLR0913
+def build_sa_execution_engine(  # noqa: PLR0913 # FIXME CoP
     df: pd.DataFrame,
     sa: ModuleType,
     schema: Optional[str] = None,
@@ -1051,10 +1069,7 @@ def build_spark_engine(
         )
         != 1
     ):
-        raise ValueError("Exactly one of batch_id or batch_definition must be specified.")  # noqa: TRY003
-
-    if batch_id is None:
-        batch_id = cast(LegacyBatchDefinition, batch_definition).id
+        raise ValueError("Exactly one of batch_id or batch_definition must be specified.")  # noqa: TRY003 # FIXME CoP
 
     if isinstance(df, pd.DataFrame):
         if schema is None:
@@ -1065,18 +1080,18 @@ def build_spark_engine(
                 )
                 for record in df.to_records(index=False)
             ]
-            schema = df.columns.tolist()  # type: ignore[assignment]
+            schema = df.columns.tolist()  # type: ignore[assignment] # FIXME CoP
         else:
             data = df
 
-        df = spark.createDataFrame(data=data, schema=schema)  # type: ignore[type-var,arg-type]
+        df = spark.createDataFrame(data=data, schema=schema)  # type: ignore[type-var,arg-type] # FIXME CoP
 
     conf: Iterable[Tuple[str, str]] = spark.sparkContext.getConf().getAll()
     spark_config: Dict[str, Any] = dict(conf)
     execution_engine = SparkDFExecutionEngine(
         spark_config=spark_config,
         batch_data_dict={
-            batch_id: df,
+            batch_id or cast(LegacyBatchDefinition, batch_definition).id: df,
         },
     )
     return execution_engine
@@ -1251,10 +1266,10 @@ def candidate_test_is_on_temporary_notimplemented_list_v3_api(context, expectati
             # a github issue tracking adding the test with BigQuery.
             ###
             expectations_not_implemented_v3_sql.append(
-                "expect_column_kl_divergence_to_be_less_than"  # TODO: will collect for over 60 minutes, and will not completes  # noqa: E501
+                "expect_column_kl_divergence_to_be_less_than"  # TODO: will collect for over 60 minutes, and will not completes  # noqa: E501 # FIXME CoP
             )
             expectations_not_implemented_v3_sql.append(
-                "expect_column_quantile_values_to_be_between"  # TODO: will run but will add about 1hr to pipeline.  # noqa: E501
+                "expect_column_quantile_values_to_be_between"  # TODO: will run but will add about 1hr to pipeline.  # noqa: E501 # FIXME CoP
             )
         return expectation_type in expectations_not_implemented_v3_sql
 
@@ -1292,7 +1307,7 @@ def candidate_test_is_on_temporary_notimplemented_list_v3_api(context, expectati
     return False
 
 
-def build_test_backends_list(  # noqa: C901, PLR0912, PLR0913, PLR0915
+def build_test_backends_list(  # noqa: C901, PLR0912, PLR0913, PLR0915 # FIXME CoP
     include_pandas=True,
     include_spark=False,
     include_sqlalchemy=True,
@@ -1322,7 +1337,7 @@ def build_test_backends_list(  # noqa: C901, PLR0912, PLR0913, PLR0915
 
         if not pyspark.pyspark:
             if raise_exceptions_for_backends is True:
-                raise ValueError("spark tests are requested, but pyspark is not installed")  # noqa: TRY003
+                raise ValueError("spark tests are requested, but pyspark is not installed")  # noqa: TRY003 # FIXME CoP
             else:
                 logger.warning("spark tests are requested, but pyspark is not installed")
         else:
@@ -1333,7 +1348,7 @@ def build_test_backends_list(  # noqa: C901, PLR0912, PLR0913, PLR0915
         sa: Optional[ModuleType] = import_library_module(module_name="sqlalchemy")
         if sa is None:
             if raise_exceptions_for_backends is True:
-                raise ImportError("sqlalchemy tests are requested, but sqlalchemy in not installed")  # noqa: TRY003
+                raise ImportError("sqlalchemy tests are requested, but sqlalchemy in not installed")  # noqa: TRY003 # FIXME CoP
             else:
                 logger.warning("sqlalchemy tests are requested, but sqlalchemy in not installed")
             return test_backends
@@ -1354,15 +1369,15 @@ def build_test_backends_list(  # noqa: C901, PLR0912, PLR0913, PLR0915
             checker = LockingConnectionCheck(sa, connection_string)
             if checker.is_valid() is True:
                 test_backends += ["postgresql"]
-            else:  # noqa: PLR5501
+            else:  # noqa: PLR5501 # FIXME CoP
                 if raise_exceptions_for_backends is True:
-                    raise ValueError(  # noqa: TRY003
-                        f"backend-specific tests are requested, but unable to connect to the database at "  # noqa: E501
+                    raise ValueError(  # noqa: TRY003 # FIXME CoP
+                        f"backend-specific tests are requested, but unable to connect to the database at "  # noqa: E501 # FIXME CoP
                         f"{connection_string}"
                     )
                 else:
                     logger.warning(
-                        f"backend-specific tests are requested, but unable to connect to the database at "  # noqa: E501
+                        f"backend-specific tests are requested, but unable to connect to the database at "  # noqa: E501 # FIXME CoP
                         f"{connection_string}"
                     )
 
@@ -1373,7 +1388,7 @@ def build_test_backends_list(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 conn.close()
             except (ImportError, SQLAlchemyError):
                 if raise_exceptions_for_backends is True:
-                    raise ImportError(  # noqa: TRY003
+                    raise ImportError(  # noqa: TRY003 # FIXME CoP
                         "mysql tests are requested, but unable to connect to the mysql database at "
                         f"'mysql+pymysql://root@{db_hostname}/test_ci'"
                     )
@@ -1386,27 +1401,25 @@ def build_test_backends_list(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 test_backends += ["mysql"]
 
         if include_mssql:
-            # noinspection PyUnresolvedReferences
+            connection_string = (
+                "mssql+pyodbc://sa:ReallyStrongPwd1234%^&*@127.0.0.1:1433/test_ci"
+                "?driver=ODBC Driver 18 for SQL Server&charset=utf8"
+                "&autocommit=true&TrustServerCertificate=yes"
+            )
             try:
-                engine = sa.create_engine(
-                    f"mssql+pyodbc://sa:ReallyStrongPwd1234%^&*@{db_hostname}:1433/test_ci?"
-                    "driver=ODBC Driver 17 for SQL Server&charset=utf8&autocommit=true",
-                    # echo=True,
-                )
+                engine = sa.create_engine(connection_string)
                 conn = engine.connect()
                 conn.close()
             except (ImportError, sa.exc.SQLAlchemyError):
                 if raise_exceptions_for_backends is True:
-                    raise ImportError(  # noqa: TRY003
+                    raise ImportError(  # noqa: TRY003 # FIXME CoP
                         "mssql tests are requested, but unable to connect to the mssql database at "
-                        f"'mssql+pyodbc://sa:ReallyStrongPwd1234%^&*@{db_hostname}:1433/test_ci?"
-                        "driver=ODBC Driver 17 for SQL Server&charset=utf8&autocommit=true'",
+                        f"{connection_string}",
                     )
                 else:
                     logger.warning(
                         "mssql tests are requested, but unable to connect to the mssql database at "
-                        f"'mssql+pyodbc://sa:ReallyStrongPwd1234%^&*@{db_hostname}:1433/test_ci?"
-                        "driver=ODBC Driver 17 for SQL Server&charset=utf8&autocommit=true'",
+                        f"{connection_string}",
                     )
             else:
                 test_backends += ["mssql"]
@@ -1419,7 +1432,7 @@ def build_test_backends_list(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 conn.close()
             except (ImportError, ValueError, sa.exc.SQLAlchemyError) as e:
                 if raise_exceptions_for_backends is True:
-                    raise ImportError("bigquery tests are requested, but unable to connect") from e  # noqa: TRY003
+                    raise ImportError("bigquery tests are requested, but unable to connect") from e  # noqa: TRY003 # FIXME CoP
                 else:
                     logger.warning(f"bigquery tests are requested, but unable to connect; {e!r}")
             else:
@@ -1442,7 +1455,7 @@ def build_test_backends_list(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 and not aws_config_file
             ):
                 if raise_exceptions_for_backends is True:
-                    raise ImportError("AWS tests are requested, but credentials were not set up")  # noqa: TRY003
+                    raise ImportError("AWS tests are requested, but credentials were not set up")  # noqa: TRY003 # FIXME CoP
                 else:
                     logger.warning("AWS tests are requested, but credentials were not set up")
 
@@ -1454,7 +1467,7 @@ def build_test_backends_list(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 conn.close()
             except (ImportError, ValueError, sa.exc.SQLAlchemyError) as e:
                 if raise_exceptions_for_backends is True:
-                    raise ImportError(  # noqa: TRY003
+                    raise ImportError(  # noqa: TRY003 # FIXME CoP
                         "clickhouse tests are requested, but unable to connect"
                     ) from e
                 else:
@@ -1470,7 +1483,7 @@ def build_test_backends_list(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 conn.close()
             except (ImportError, ValueError, sa.exc.SQLAlchemyError) as e:
                 if raise_exceptions_for_backends is True:
-                    raise ImportError("trino tests are requested, but unable to connect") from e  # noqa: TRY003
+                    raise ImportError("trino tests are requested, but unable to connect") from e  # noqa: TRY003 # FIXME CoP
                 else:
                     logger.warning(f"trino tests are requested, but unable to connect; {e!r}")
             else:
@@ -1482,7 +1495,7 @@ def build_test_backends_list(  # noqa: C901, PLR0912, PLR0913, PLR0915
             azure_access_key: Optional[str] = os.getenv("AZURE_ACCESS_KEY")
             if not azure_access_key and not azure_connection_string and not azure_credential:
                 if raise_exceptions_for_backends is True:
-                    raise ImportError("Azure tests are requested, but credentials were not set up")  # noqa: TRY003
+                    raise ImportError("Azure tests are requested, but credentials were not set up")  # noqa: TRY003 # FIXME CoP
                 else:
                     logger.warning("Azure tests are requested, but credentials were not set up")
             test_backends += ["azure"]
@@ -1495,7 +1508,7 @@ def build_test_backends_list(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 conn.close()
             except (ImportError, ValueError, sa.exc.SQLAlchemyError) as e:
                 if raise_exceptions_for_backends is True:
-                    raise ImportError("redshift tests are requested, but unable to connect") from e  # noqa: TRY003
+                    raise ImportError("redshift tests are requested, but unable to connect") from e  # noqa: TRY003 # FIXME CoP
                 else:
                     logger.warning(f"redshift tests are requested, but unable to connect; {e!r}")
             else:
@@ -1509,7 +1522,7 @@ def build_test_backends_list(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 conn.close()
             except (ImportError, ValueError, sa.exc.SQLAlchemyError) as e:
                 if raise_exceptions_for_backends is True:
-                    raise ImportError("athena tests are requested, but unable to connect") from e  # noqa: TRY003
+                    raise ImportError("athena tests are requested, but unable to connect") from e  # noqa: TRY003 # FIXME CoP
                 else:
                     logger.warning(f"athena tests are requested, but unable to connect; {e!r}")
             else:
@@ -1523,7 +1536,7 @@ def build_test_backends_list(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 conn.close()
             except (ImportError, ValueError, sa.exc.SQLAlchemyError) as e:
                 if raise_exceptions_for_backends is True:
-                    raise ImportError("snowflake tests are requested, but unable to connect") from e  # noqa: TRY003
+                    raise ImportError("snowflake tests are requested, but unable to connect") from e  # noqa: TRY003 # FIXME CoP
                 else:
                     logger.warning(f"snowflake tests are requested, but unable to connect; {e!r}")
             else:
@@ -1532,7 +1545,7 @@ def build_test_backends_list(  # noqa: C901, PLR0912, PLR0913, PLR0915
     return test_backends
 
 
-def generate_expectation_tests(  # noqa: C901, PLR0912, PLR0913, PLR0915
+def generate_expectation_tests(  # noqa: C901, PLR0912, PLR0913, PLR0915 # FIXME CoP
     expectation_type: str,
     test_data_cases: List[ExpectationTestDataCases],
     execution_engine_diagnostics: ExpectationExecutionEngineDiagnostics,
@@ -1555,14 +1568,14 @@ def generate_expectation_tests(  # noqa: C901, PLR0912, PLR0913, PLR0915
     :param only_consider_these_backends: optional list of backends to consider
     :param context Instance of any child of "AbstractDataContext" class
     :return: list of parametrized tests with loaded validators and accessible backends
-    """  # noqa: E501
-    _debug = lambda x: x  # noqa: E731
-    _error = lambda x: x  # noqa: E731
+    """  # noqa: E501 # FIXME CoP
+    _debug = lambda x: x  # noqa: E731 # FIXME CoP
+    _error = lambda x: x  # noqa: E731 # FIXME CoP
     if debug_logger:
-        _debug = lambda x: debug_logger.debug(  # noqa: E731
+        _debug = lambda x: debug_logger.debug(  # noqa: E731 # FIXME CoP
             f"(generate_expectation_tests) {x}"
         )
-        _error = lambda x: debug_logger.error(  # noqa: E731
+        _error = lambda x: debug_logger.error(  # noqa: E731 # FIXME CoP
             f"(generate_expectation_tests) {x}"
         )
 
@@ -1629,7 +1642,7 @@ def generate_expectation_tests(  # noqa: C901, PLR0912, PLR0913, PLR0915
     num_test_data_cases = len(test_data_cases)
     for i, d in enumerate(test_data_cases, 1):
         _debug(f"test_data_case {i}/{num_test_data_cases}")
-        d = copy.deepcopy(d)  # noqa: PLW2901
+        d = copy.deepcopy(d)  # noqa: PLW2901 # FIXME CoP
         titles = []
         only_fors = []
         suppress_test_fors = []
@@ -1639,7 +1652,7 @@ def generate_expectation_tests(  # noqa: C901, PLR0912, PLR0913, PLR0915
             suppress_test_fors.append(_test_case.suppress_test_for)
         _debug(f"titles -> {titles}")
         _debug(
-            f"only_fors -> {only_fors}  suppress_test_fors -> {suppress_test_fors}  only_consider_these_backends -> {only_consider_these_backends}"  # noqa: E501
+            f"only_fors -> {only_fors}  suppress_test_fors -> {suppress_test_fors}  only_consider_these_backends -> {only_consider_these_backends}"  # noqa: E501 # FIXME CoP
         )
         for c in backends:
             _debug(f"Getting validators with data: {c}")
@@ -1649,7 +1662,7 @@ def generate_expectation_tests(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 for sup in suppress_test_fors
             ]
             only_fors_ok = []
-            for i, only_for in enumerate(only_fors):  # noqa: PLW2901
+            for i, only_for in enumerate(only_fors):  # noqa: PLW2901 # FIXME CoP
                 if not only_for:
                     only_fors_ok.append(True)
                     continue
@@ -1763,7 +1776,7 @@ def generate_expectation_tests(  # noqa: C901, PLR0912, PLR0913, PLR0915
                         # print(pd.DataFrame(d.get("data_alt")))
                         # print()
                         _error(
-                            f"PROBLEM with get_test_validator_with_data in backend {c} for {expectation_type} from data AND data_alt {repr(e)[:300]}"  # noqa: E501
+                            f"PROBLEM with get_test_validator_with_data in backend {c} for {expectation_type} from data AND data_alt {repr(e)[:300]}"  # noqa: E501 # FIXME CoP
                         )
                         parametrized_tests.append(
                             {
@@ -1778,11 +1791,11 @@ def generate_expectation_tests(  # noqa: C901, PLR0912, PLR0913, PLR0915
                     else:
                         # print("\n[[ The alternate data worked!! ]]\n")
                         _debug(
-                            f"Needed to use data_alt for backend {c}, but it worked for {expectation_type}"  # noqa: E501
+                            f"Needed to use data_alt for backend {c}, but it worked for {expectation_type}"  # noqa: E501 # FIXME CoP
                         )
                 else:
                     _error(
-                        f"PROBLEM with get_test_validator_with_data in backend {c} for {expectation_type} from data (no data_alt to try) {repr(e)[:300]}"  # noqa: E501
+                        f"PROBLEM with get_test_validator_with_data in backend {c} for {expectation_type} from data (no data_alt to try) {repr(e)[:300]}"  # noqa: E501 # FIXME CoP
                     )
                     parametrized_tests.append(
                         {
@@ -1818,7 +1831,7 @@ def generate_expectation_tests(  # noqa: C901, PLR0912, PLR0913, PLR0915
     return parametrized_tests
 
 
-def should_we_generate_this_test(  # noqa: C901, PLR0911, PLR0912, PLR0913
+def should_we_generate_this_test(  # noqa: C901, PLR0911, PLR0912, PLR0913 # FIXME CoP
     backend: str,
     expectation_test_case: ExpectationTestCase,
     ignore_suppress: bool = False,
@@ -1826,9 +1839,9 @@ def should_we_generate_this_test(  # noqa: C901, PLR0911, PLR0912, PLR0913
     extra_debug_info: str = "",
     debug_logger: Optional[logging.Logger] = None,
 ):
-    _debug = lambda x: x  # noqa: E731
+    _debug = lambda x: x  # noqa: E731 # FIXME CoP
     if debug_logger:
-        _debug = lambda x: debug_logger.debug(  # noqa: E731
+        _debug = lambda x: debug_logger.debug(  # noqa: E731 # FIXME CoP
             f"(should_we_generate_this_test) {x}"
         )
 
@@ -1842,23 +1855,23 @@ def should_we_generate_this_test(  # noqa: C901, PLR0911, PLR0912, PLR0913
     if backend in expectation_test_case.suppress_test_for:
         if ignore_suppress:
             _debug(
-                f"Should be suppressing {expectation_test_case.title} for {backend}, but ignore_suppress is True | {extra_debug_info}"  # noqa: E501
+                f"Should be suppressing {expectation_test_case.title} for {backend}, but ignore_suppress is True | {extra_debug_info}"  # noqa: E501 # FIXME CoP
             )
             return True
         else:
             _debug(
-                f"Backend {backend} is suppressed for test {expectation_test_case.title}: | {extra_debug_info}"  # noqa: E501
+                f"Backend {backend} is suppressed for test {expectation_test_case.title}: | {extra_debug_info}"  # noqa: E501 # FIXME CoP
             )
             return False
     if "sqlalchemy" in expectation_test_case.suppress_test_for and backend in SQL_DIALECT_NAMES:
         if ignore_suppress:
             _debug(
-                f"Should be suppressing {expectation_test_case.title} for sqlalchemy (including {backend}), but ignore_suppress is True | {extra_debug_info}"  # noqa: E501
+                f"Should be suppressing {expectation_test_case.title} for sqlalchemy (including {backend}), but ignore_suppress is True | {extra_debug_info}"  # noqa: E501 # FIXME CoP
             )
             return True
         else:
             _debug(
-                f"All sqlalchemy (including {backend}) is suppressed for test: {expectation_test_case.title} | {extra_debug_info}"  # noqa: E501
+                f"All sqlalchemy (including {backend}) is suppressed for test: {expectation_test_case.title} | {extra_debug_info}"  # noqa: E501 # FIXME CoP
             )
             return False
     if expectation_test_case.only_for is not None and expectation_test_case.only_for:
@@ -1874,19 +1887,19 @@ def should_we_generate_this_test(  # noqa: C901, PLR0911, PLR0912, PLR0913
                     if major == "0" and minor in ["22", "23"]:
                         return True
                 elif "pandas>=024" in expectation_test_case.only_for:
-                    if (major == "0" and int(minor) >= 24) or int(  # noqa: PLR2004
+                    if (major == "0" and int(minor) >= 24) or int(  # noqa: PLR2004 # FIXME CoP
                         major
                     ) >= 1:
                         return True
 
             if ignore_only_for:
                 _debug(
-                    f"Should normally not run test {expectation_test_case.title} for {backend}, but ignore_only_for is True | {extra_debug_info}"  # noqa: E501
+                    f"Should normally not run test {expectation_test_case.title} for {backend}, but ignore_only_for is True | {extra_debug_info}"  # noqa: E501 # FIXME CoP
                 )
                 return True
             else:
                 _debug(
-                    f"Only {expectation_test_case.only_for} allowed (not {backend}) for test: {expectation_test_case.title} | {extra_debug_info}"  # noqa: E501
+                    f"Only {expectation_test_case.only_for} allowed (not {backend}) for test: {expectation_test_case.title} | {extra_debug_info}"  # noqa: E501 # FIXME CoP
                 )
                 return False
 
@@ -1894,7 +1907,7 @@ def should_we_generate_this_test(  # noqa: C901, PLR0911, PLR0912, PLR0913
 
 
 def sort_unexpected_values(test_value_list, result_value_list):
-    # check if value can be sorted; if so, sort so arbitrary ordering of results does not cause failure  # noqa: E501
+    # check if value can be sorted; if so, sort so arbitrary ordering of results does not cause failure  # noqa: E501 # FIXME CoP
     if (isinstance(test_value_list, list)) & (len(test_value_list) >= 1):
         # __lt__ is not implemented for python dictionaries making sorting trickier
         # in our case, we will sort on the values for each key sequentially
@@ -1915,7 +1928,7 @@ def sort_unexpected_values(test_value_list, result_value_list):
     return test_value_list, result_value_list
 
 
-def evaluate_json_test_v3_api(  # noqa: C901, PLR0912, PLR0913
+def evaluate_json_test_v3_api(  # noqa: C901, PLR0912, PLR0913 # FIXME CoP
     validator: Validator,
     expectation_type: str,
     test: Dict[str, Any],
@@ -1947,13 +1960,13 @@ def evaluate_json_test_v3_api(  # noqa: C901, PLR0912, PLR0913
     :param debug_logger: logger instance or None
     :param pk_column: If True, then the primary-key column has been defined in the json test data.
     :return: Tuple(ExpectationValidationResult, error_message, stack_trace). asserts correctness of results.
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
     if debug_logger is not None:
-        _debug = lambda x: debug_logger.debug(  # noqa: E731
+        _debug = lambda x: debug_logger.debug(  # noqa: E731 # FIXME CoP
             f"(evaluate_json_test_v3_api) {x}"
         )
     else:
-        _debug = lambda x: x  # noqa: E731
+        _debug = lambda x: x  # noqa: E731 # FIXME CoP
 
     expectation_suite = ExpectationSuite("json_test_suite")
     # noinspection PyProtectedMember
@@ -1961,22 +1974,22 @@ def evaluate_json_test_v3_api(  # noqa: C901, PLR0912, PLR0913
     # validator.set_default_expectation_argument("result_format", "COMPLETE")
 
     if "title" not in test:
-        raise ValueError("Invalid test configuration detected: 'title' is required.")  # noqa: TRY003
+        raise ValueError("Invalid test configuration detected: 'title' is required.")  # noqa: TRY003 # FIXME CoP
 
     if "exact_match_out" not in test:
-        raise ValueError("Invalid test configuration detected: 'exact_match_out' is required.")  # noqa: TRY003
+        raise ValueError("Invalid test configuration detected: 'exact_match_out' is required.")  # noqa: TRY003 # FIXME CoP
 
     if "input" not in test:
         if "in" in test:
             test["input"] = test["in"]
         else:
-            raise ValueError("Invalid test configuration detected: 'input' is required.")  # noqa: TRY003
+            raise ValueError("Invalid test configuration detected: 'input' is required.")  # noqa: TRY003 # FIXME CoP
 
     if "output" not in test:
         if "out" in test:
             test["output"] = test["out"]
         else:
-            raise ValueError("Invalid test configuration detected: 'output' is required.")  # noqa: TRY003
+            raise ValueError("Invalid test configuration detected: 'output' is required.")  # noqa: TRY003 # FIXME CoP
 
     kwargs = copy.deepcopy(test["input"])
     error_message = None
@@ -2029,10 +2042,10 @@ def evaluate_json_test_v3_api(  # noqa: C901, PLR0912, PLR0913
     return (result, error_message, stack_trace)
 
 
-def check_json_test_result(  # noqa: C901, PLR0912, PLR0915
+def check_json_test_result(  # noqa: C901, PLR0912, PLR0915 # FIXME CoP
     test, result, pk_column=False
 ) -> None:
-    # check for id_pk results in cases where pk_column is true and unexpected_index_list already exists  # noqa: E501
+    # check for id_pk results in cases where pk_column is true and unexpected_index_list already exists  # noqa: E501 # FIXME CoP
     # this will work for testing since result_format is COMPLETE
     if pk_column:
         if not result["success"]:
@@ -2092,7 +2105,7 @@ def check_json_test_result(  # noqa: C901, PLR0912, PLR0915
                     ],
                     rtol=RTOL,
                     atol=ATOL,
-                ), f"(RTOL={RTOL}, ATOL={ATOL}) {result['result']['observed_value']} not np.allclose to {expectationValidationResultSchema.load(test['output'])['result']['observed_value']}"  # noqa: E501
+                ), f"(RTOL={RTOL}, ATOL={ATOL}) {result['result']['observed_value']} not np.allclose to {expectationValidationResultSchema.load(test['output'])['result']['observed_value']}"  # noqa: E501 # FIXME CoP
             else:
                 assert result == expectationValidationResultSchema.load(
                     test["output"]
@@ -2102,9 +2115,9 @@ def check_json_test_result(  # noqa: C901, PLR0912, PLR0915
                 test["output"]
             ), f"{result} != {expectationValidationResultSchema.load(test['output'])}"
     else:
-        # Convert result to json since our tests are reading from json so cannot easily contain richer types (e.g. NaN)  # noqa: E501
-        # NOTE - 20191031 - JPC - we may eventually want to change these tests as we update our view on how  # noqa: E501
-        # representations, serializations, and objects should interact and how much of that is shown to the user.  # noqa: E501
+        # Convert result to json since our tests are reading from json so cannot easily contain richer types (e.g. NaN)  # noqa: E501 # FIXME CoP
+        # NOTE - 20191031 - JPC - we may eventually want to change these tests as we update our view on how  # noqa: E501 # FIXME CoP
+        # representations, serializations, and objects should interact and how much of that is shown to the user.  # noqa: E501 # FIXME CoP
         result = result.to_json_dict()
         for key, value in test["output"].items():
             if key == "success":
@@ -2115,7 +2128,7 @@ def check_json_test_result(  # noqa: C901, PLR0912, PLR0915
                             value,
                             rtol=RTOL,
                             atol=ATOL,
-                        ), f"(RTOL={RTOL}, ATOL={ATOL}) {result['success']} not np.allclose to {value}"  # noqa: E501
+                        ), f"(RTOL={RTOL}, ATOL={ATOL}) {result['success']} not np.allclose to {value}"  # noqa: E501 # FIXME CoP
                     except TypeError:
                         assert result["success"] == value, f"{result['success']} != {value}"
                 else:
@@ -2126,7 +2139,7 @@ def check_json_test_result(  # noqa: C901, PLR0912, PLR0915
                     if isinstance(value, dict):
                         assert (
                             set(result["result"]["observed_value"].keys()) == set(value.keys())
-                        ), f"{set(result['result']['observed_value'].keys())} != {set(value.keys())}"  # noqa: E501
+                        ), f"{set(result['result']['observed_value'].keys())} != {set(value.keys())}"  # noqa: E501 # FIXME CoP
                         for k, v in value.items():
                             assert np.allclose(
                                 result["result"]["observed_value"][k],
@@ -2139,7 +2152,7 @@ def check_json_test_result(  # noqa: C901, PLR0912, PLR0915
                             value,
                             rtol=test["tolerance"],
                         )
-                else:  # noqa: PLR5501
+                else:  # noqa: PLR5501 # FIXME CoP
                     if isinstance(value, dict) and "values" in value:
                         try:
                             assert np.allclose(
@@ -2147,7 +2160,7 @@ def check_json_test_result(  # noqa: C901, PLR0912, PLR0915
                                 value["values"],
                                 rtol=RTOL,
                                 atol=ATOL,
-                            ), f"(RTOL={RTOL}, ATOL={ATOL}) {result['result']['observed_value']['values']} not np.allclose to {value['values']}"  # noqa: E501
+                            ), f"(RTOL={RTOL}, ATOL={ATOL}) {result['result']['observed_value']['values']} not np.allclose to {value['values']}"  # noqa: E501 # FIXME CoP
                         except TypeError as e:
                             print(e)
                             assert (
@@ -2159,14 +2172,14 @@ def check_json_test_result(  # noqa: C901, PLR0912, PLR0915
                             value,
                             rtol=RTOL,
                             atol=ATOL,
-                        ), f"(RTOL={RTOL}, ATOL={ATOL}) {result['result']['observed_value']} not np.allclose to {value}"  # noqa: E501
+                        ), f"(RTOL={RTOL}, ATOL={ATOL}) {result['result']['observed_value']} not np.allclose to {value}"  # noqa: E501 # FIXME CoP
                     else:
                         assert (
                             result["result"]["observed_value"] == value
                         ), f"{result['result']['observed_value']} != {value}"
 
-            # NOTE: This is a key used ONLY for testing cases where an expectation is legitimately allowed to return  # noqa: E501
-            # any of multiple possible observed_values. expect_column_values_to_be_of_type is one such expectation.  # noqa: E501
+            # NOTE: This is a key used ONLY for testing cases where an expectation is legitimately allowed to return  # noqa: E501 # FIXME CoP
+            # any of multiple possible observed_values. expect_column_values_to_be_of_type is one such expectation.  # noqa: E501 # FIXME CoP
             elif key == "observed_value_list":
                 assert result["result"]["observed_value"] in value
 
@@ -2228,11 +2241,11 @@ def check_json_test_result(  # noqa: C901, PLR0912, PLR0915
                     else:
                         assert result["result"]["details"]["observed_cdf"]["x"][0] == value
                 else:
-                    raise ValueError(f"Invalid test specification: unknown key {key} in 'out'")  # noqa: TRY003
+                    raise ValueError(f"Invalid test specification: unknown key {key} in 'out'")  # noqa: TRY003 # FIXME CoP
 
             elif key == "traceback_substring":
                 if "raised_exception" not in result["exception_info"]:
-                    # TODO JT: This accounts for a dictionary of type {"metric_id": ExceptionInfo} path defined in  # noqa: E501
+                    # TODO JT: This accounts for a dictionary of type {"metric_id": ExceptionInfo} path defined in  # noqa: E501 # FIXME CoP
                     #  validator._resolve_suite_level_graph_and_process_metric_evaluation_errors
                     for k, v in result["exception_info"].items():
                         assert v["raised_exception"], f"{v['raised_exception']}"
@@ -2281,7 +2294,7 @@ def check_json_test_result(  # noqa: C901, PLR0912, PLR0915
                     )
 
             else:
-                raise ValueError(f"Invalid test specification: unknown key {key} in 'out'")  # noqa: TRY003
+                raise ValueError(f"Invalid test specification: unknown key {key} in 'out'")  # noqa: TRY003 # FIXME CoP
 
 
 def generate_test_table_name(
@@ -2307,7 +2320,7 @@ def generate_dataset_name_from_expectation_name(
         sub_index (Optional int): In cases where dataset is a list, the additional index is used.
 
     Returns: dataset_name
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     dataset_name: str
     if not sub_index:
@@ -2335,10 +2348,10 @@ def _check_if_valid_dataset_name(dataset_name: str) -> str:
 
     Returns: dataset_name
 
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
     if not re.match(r"^[A-Za-z0-9_]+$", dataset_name):
-        raise ExecutionEngineError(  # noqa: TRY003
-            f"dataset_name: {dataset_name} is not valid, because it contains non-alphanumeric and _ characters."  # noqa: E501
+        raise ExecutionEngineError(  # noqa: TRY003 # FIXME CoP
+            f"dataset_name: {dataset_name} is not valid, because it contains non-alphanumeric and _ characters."  # noqa: E501 # FIXME CoP
             f"Please check your configuration."
         )
 
@@ -2346,7 +2359,7 @@ def _check_if_valid_dataset_name(dataset_name: str) -> str:
         # starting from the end, so that we always get the index and sub_index
         new_dataset_name = dataset_name[-MAX_TABLE_NAME_LENGTH:]
         logger.info(
-            f"dataset_name: '{dataset_name}' was truncated to '{new_dataset_name}' to keep within length limits."  # noqa: E501
+            f"dataset_name: '{dataset_name}' was truncated to '{new_dataset_name}' to keep within length limits."  # noqa: E501 # FIXME CoP
         )
         dataset_name = new_dataset_name
 
@@ -2363,7 +2376,7 @@ def _create_bigquery_engine() -> sqlalchemy.Engine:
 def _get_bigquery_connection_string() -> str:
     gcp_project = os.getenv("GE_TEST_GCP_PROJECT")
     if not gcp_project:
-        raise ValueError(  # noqa: TRY003
+        raise ValueError(  # noqa: TRY003 # FIXME CoP
             "Environment Variable GE_TEST_GCP_PROJECT is required to run BigQuery expectation tests"
         )
 
@@ -2373,8 +2386,8 @@ def _get_bigquery_connection_string() -> str:
 def _bigquery_dataset() -> str:
     dataset = os.getenv("GE_TEST_BIGQUERY_DATASET")
     if not dataset:
-        raise ValueError(  # noqa: TRY003
-            "Environment Variable GE_TEST_BIGQUERY_DATASET is required to run BigQuery expectation tests"  # noqa: E501
+        raise ValueError(  # noqa: TRY003 # FIXME CoP
+            "Environment Variable GE_TEST_BIGQUERY_DATASET is required to run BigQuery expectation tests"  # noqa: E501 # FIXME CoP
         )
     return dataset
 
@@ -2392,7 +2405,7 @@ def _create_clickhouse_engine(
         _get_clickhouse_connection_string(hostname=hostname, schema_name=schema_name)
     )
     from clickhouse_sqlalchemy.exceptions import DatabaseException
-    from sqlalchemy import text  # noqa: TID251
+    from sqlalchemy import text  # noqa: TID251 # FIXME CoP
 
     with engine.begin() as conn:
         try:
@@ -2434,19 +2447,19 @@ def _create_trino_engine(
     # trino_password = os.getenv("GE_TEST_TRINO_PASSWORD")
     # if not trino_password:
     #     raise ValueError(
-    #         "Environment Variable GE_TEST_TRINO_PASSWORD is required to run trino expectation tests."  # noqa: E501
+    #         "Environment Variable GE_TEST_TRINO_PASSWORD is required to run trino expectation tests."  # noqa: E501 # FIXME CoP
     #     )
 
     # trino_account = os.getenv("GE_TEST_TRINO_ACCOUNT")
     # if not trino_account:
     #     raise ValueError(
-    #         "Environment Variable GE_TEST_TRINO_ACCOUNT is required to run trino expectation tests."  # noqa: E501
+    #         "Environment Variable GE_TEST_TRINO_ACCOUNT is required to run trino expectation tests."  # noqa: E501 # FIXME CoP
     #     )
 
     # trino_cluster = os.getenv("GE_TEST_TRINO_CLUSTER")
     # if not trino_cluster:
     #     raise ValueError(
-    #         "Environment Variable GE_TEST_TRINO_CLUSTER is required to run trino expectation tests."  # noqa: E501
+    #         "Environment Variable GE_TEST_TRINO_CLUSTER is required to run trino expectation tests."  # noqa: E501 # FIXME CoP
     #     )
 
     # return create_engine(
@@ -2466,36 +2479,36 @@ def _get_redshift_connection_string() -> str:
     """
     Copied get_redshift_connection_url func from tests/test_utils.py
     """
-    host = os.environ.get("REDSHIFT_HOST")  # noqa: TID251
-    port = os.environ.get("REDSHIFT_PORT")  # noqa: TID251
-    user = os.environ.get("REDSHIFT_USERNAME")  # noqa: TID251
-    pswd = os.environ.get("REDSHIFT_PASSWORD")  # noqa: TID251
-    db = os.environ.get("REDSHIFT_DATABASE")  # noqa: TID251
-    ssl = os.environ.get("REDSHIFT_SSLMODE")  # noqa: TID251
+    host = os.environ.get("REDSHIFT_HOST")  # noqa: TID251 # FIXME CoP
+    port = os.environ.get("REDSHIFT_PORT")  # noqa: TID251 # FIXME CoP
+    user = os.environ.get("REDSHIFT_USERNAME")  # noqa: TID251 # FIXME CoP
+    pswd = os.environ.get("REDSHIFT_PASSWORD")  # noqa: TID251 # FIXME CoP
+    db = os.environ.get("REDSHIFT_DATABASE")  # noqa: TID251 # FIXME CoP
+    ssl = os.environ.get("REDSHIFT_SSLMODE")  # noqa: TID251 # FIXME CoP
 
     if not host:
-        raise ValueError(  # noqa: TRY003
-            "Environment Variable REDSHIFT_HOST is required to run integration tests against Redshift"  # noqa: E501
+        raise ValueError(  # noqa: TRY003 # FIXME CoP
+            "Environment Variable REDSHIFT_HOST is required to run integration tests against Redshift"  # noqa: E501 # FIXME CoP
         )
     if not port:
-        raise ValueError(  # noqa: TRY003
-            "Environment Variable REDSHIFT_PORT is required to run integration tests against Redshift"  # noqa: E501
+        raise ValueError(  # noqa: TRY003 # FIXME CoP
+            "Environment Variable REDSHIFT_PORT is required to run integration tests against Redshift"  # noqa: E501 # FIXME CoP
         )
     if not user:
-        raise ValueError(  # noqa: TRY003
-            "Environment Variable REDSHIFT_USERNAME is required to run integration tests against Redshift"  # noqa: E501
+        raise ValueError(  # noqa: TRY003 # FIXME CoP
+            "Environment Variable REDSHIFT_USERNAME is required to run integration tests against Redshift"  # noqa: E501 # FIXME CoP
         )
     if not pswd:
-        raise ValueError(  # noqa: TRY003
-            "Environment Variable REDSHIFT_PASSWORD is required to run integration tests against Redshift"  # noqa: E501
+        raise ValueError(  # noqa: TRY003 # FIXME CoP
+            "Environment Variable REDSHIFT_PASSWORD is required to run integration tests against Redshift"  # noqa: E501 # FIXME CoP
         )
     if not db:
-        raise ValueError(  # noqa: TRY003
-            "Environment Variable REDSHIFT_DATABASE is required to run integration tests against Redshift"  # noqa: E501
+        raise ValueError(  # noqa: TRY003 # FIXME CoP
+            "Environment Variable REDSHIFT_DATABASE is required to run integration tests against Redshift"  # noqa: E501 # FIXME CoP
         )
     if not ssl:
-        raise ValueError(  # noqa: TRY003
-            "Environment Variable REDSHIFT_SSLMODE is required to run integration tests against Redshift"  # noqa: E501
+        raise ValueError(  # noqa: TRY003 # FIXME CoP
+            "Environment Variable REDSHIFT_SSLMODE is required to run integration tests against Redshift"  # noqa: E501 # FIXME CoP
         )
 
     url = f"redshift+psycopg2://{user}:{pswd}@{host}:{port}/{db}?sslmode={ssl}"
@@ -2518,13 +2531,13 @@ def _get_athena_connection_string(db_name_env_var: str = "ATHENA_DB_NAME") -> st
     ATHENA_STAGING_S3: Optional[str] = os.getenv("ATHENA_STAGING_S3")
 
     if not ATHENA_DB_NAME:
-        raise ValueError(  # noqa: TRY003
-            f"Environment Variable {db_name_env_var} is required to run integration tests against AWS Athena"  # noqa: E501
+        raise ValueError(  # noqa: TRY003 # FIXME CoP
+            f"Environment Variable {db_name_env_var} is required to run integration tests against AWS Athena"  # noqa: E501 # FIXME CoP
         )
 
     if not ATHENA_STAGING_S3:
-        raise ValueError(  # noqa: TRY003
-            "Environment Variable ATHENA_STAGING_S3 is required to run integration tests against AWS Athena"  # noqa: E501
+        raise ValueError(  # noqa: TRY003 # FIXME CoP
+            "Environment Variable ATHENA_STAGING_S3 is required to run integration tests against AWS Athena"  # noqa: E501 # FIXME CoP
         )
 
     url = f"awsathena+rest://@athena.us-east-1.amazonaws.com/{ATHENA_DB_NAME}?s3_staging_dir={ATHENA_STAGING_S3}"
@@ -2540,13 +2553,13 @@ def _get_snowflake_connection_string() -> str:
     """
     Copied get_snowflake_connection_url func from tests/test_utils.py
     """
-    sfUser = os.environ.get("SNOWFLAKE_USER")  # noqa: TID251
-    sfPswd = os.environ.get("SNOWFLAKE_PW")  # noqa: TID251
-    sfAccount = os.environ.get("SNOWFLAKE_ACCOUNT")  # noqa: TID251
-    sfDatabase = os.environ.get("SNOWFLAKE_DATABASE")  # noqa: TID251
-    sfSchema = os.environ.get("SNOWFLAKE_SCHEMA", "")  # noqa: TID251
-    sfWarehouse = os.environ.get("SNOWFLAKE_WAREHOUSE")  # noqa: TID251
-    sfRole = os.environ.get("SNOWFLAKE_ROLE", "PUBLIC")  # noqa: TID251
+    sfUser = os.environ.get("SNOWFLAKE_USER")  # noqa: TID251 # FIXME CoP
+    sfPswd = os.environ.get("SNOWFLAKE_PW")  # noqa: TID251 # FIXME CoP
+    sfAccount = os.environ.get("SNOWFLAKE_ACCOUNT")  # noqa: TID251 # FIXME CoP
+    sfDatabase = os.environ.get("SNOWFLAKE_DATABASE")  # noqa: TID251 # FIXME CoP
+    sfSchema = os.environ.get("SNOWFLAKE_SCHEMA", "")  # noqa: TID251 # FIXME CoP
+    sfWarehouse = os.environ.get("SNOWFLAKE_WAREHOUSE")  # noqa: TID251 # FIXME CoP
+    sfRole = os.environ.get("SNOWFLAKE_ROLE", "PUBLIC")  # noqa: TID251 # FIXME CoP
 
     url = f"snowflake://{sfUser}:{sfPswd}@{sfAccount}/{sfDatabase}/{sfSchema}?warehouse={sfWarehouse}&role={sfRole}"
 
@@ -2560,10 +2573,10 @@ def generate_sqlite_db_path():
 
     Returns:
         str: An absolute path to the ephemeral db within the created temporary directory.
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
     tmp_dir = str(tempfile.mkdtemp())
-    abspath = os.path.abspath(  # noqa: PTH100
-        os.path.join(  # noqa: PTH118
+    abspath = os.path.abspath(  # noqa: PTH100 # FIXME CoP
+        os.path.join(  # noqa: PTH118 # FIXME CoP
             tmp_dir,
             "sqlite_db"
             + "".join([random.choice(string.ascii_letters + string.digits) for _ in range(8)])

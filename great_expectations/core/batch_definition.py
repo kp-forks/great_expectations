@@ -1,25 +1,38 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Generic, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, TypeVar
 
+from great_expectations._docs_decorators import public_api
 from great_expectations.compatibility import pydantic
 
 # if we move this import into the TYPE_CHECKING block, we need to provide the
 # Partitioner class when we update forward refs, so we just import here.
+from great_expectations.core.freshness_diagnostics import (
+    BatchDefinitionFreshnessDiagnostics,
+)
 from great_expectations.core.partitioners import ColumnPartitioner, FileNamePartitioner
 from great_expectations.core.serdes import _EncodedValidationData, _IdentifierBundle
+from great_expectations.data_context.data_context.context_factory import project_manager
+from great_expectations.exceptions import (
+    BatchDefinitionNotAddedError,
+    BatchDefinitionNotFoundError,
+    BatchDefinitionNotFreshError,
+    DataAssetNotFoundError,
+    DatasourceNotFoundError,
+)
 
 if TYPE_CHECKING:
     from great_expectations.datasource.fluent.batch_request import (
         BatchParameters,
         BatchRequest,
     )
-    from great_expectations.datasource.fluent.interfaces import Batch, DataAsset
+    from great_expectations.datasource.fluent.interfaces import Batch, DataAsset, Datasource
 
 # Depending on the Asset
 PartitionerT = TypeVar("PartitionerT", ColumnPartitioner, FileNamePartitioner, None)
 
 
+@public_api
 class BatchDefinition(pydantic.GenericModel, Generic[PartitionerT]):
     """Configuration for a batch of data.
 
@@ -36,7 +49,11 @@ class BatchDefinition(pydantic.GenericModel, Generic[PartitionerT]):
     _data_asset: Any = pydantic.PrivateAttr()
 
     @property
+    @public_api
     def data_asset(self) -> DataAsset[Any, PartitionerT]:
+        """
+        The parent DataAsset for this Batch Definition.
+        """
         return self._data_asset
 
     def set_data_asset(self, data_asset: DataAsset[Any, PartitionerT]) -> None:
@@ -52,6 +69,16 @@ class BatchDefinition(pydantic.GenericModel, Generic[PartitionerT]):
             partitioner=self.partitioner,
         )
 
+    @public_api
+    def save(self) -> None:
+        """
+        Save the batch definition to the underlying data context.
+        """
+        project_datasources = project_manager.get_datasources()
+        data_source = self.data_asset.datasource
+        project_datasources.set_datasource(name=data_source.name, ds=data_source)
+
+    @public_api
     def get_batch(self, batch_parameters: Optional[BatchParameters] = None) -> Batch:
         """
         Retrieves a batch from the underlying asset. Defaults to the last batch
@@ -63,20 +90,85 @@ class BatchDefinition(pydantic.GenericModel, Generic[PartitionerT]):
         Returns:
             A Batch of data.
         """
-        batch_list = self.data_asset.get_batch_list_from_batch_request(
-            self.build_batch_request(batch_parameters=batch_parameters)
+        batch_request = self.build_batch_request(batch_parameters=batch_parameters)
+        return self.data_asset.get_batch(batch_request)
+
+    @public_api
+    def get_batch_identifiers_list(
+        self, batch_parameters: Optional[BatchParameters] = None
+    ) -> List[Dict]:
+        """
+        Retrieves a list of available batch identifiers.
+        These identifiers can be used to fetch specific batches via batch_options.
+
+        Args:
+            batch_parameters: Additional parameters to be used in fetching the batch identifiers
+                list.
+
+        Returns:
+            A list of batch identifiers.
+        """
+        batch_request = self.build_batch_request(batch_parameters=batch_parameters)
+        return self.data_asset.get_batch_identifiers_list(batch_request)
+
+    def is_fresh(self) -> BatchDefinitionFreshnessDiagnostics:
+        diagnostics = self._is_added()
+        if not diagnostics.success:
+            return diagnostics
+        return self._is_fresh()
+
+    def _is_added(self) -> BatchDefinitionFreshnessDiagnostics:
+        return BatchDefinitionFreshnessDiagnostics(
+            errors=[] if self.id else [BatchDefinitionNotAddedError(name=self.name)]
         )
 
-        if len(batch_list) == 0:
-            raise ValueError("No batch found")  # noqa: TRY003
+    def _is_fresh(self) -> BatchDefinitionFreshnessDiagnostics:
+        datasource_dict = project_manager.get_datasources()
 
-        return batch_list[-1]
+        datasource: Datasource | None
+        try:
+            datasource = datasource_dict[self.data_asset.datasource.name]
+        except KeyError:
+            datasource = None
+        if not datasource:
+            return BatchDefinitionFreshnessDiagnostics(
+                errors=[
+                    DatasourceNotFoundError(
+                        f"Could not find datasource '{self.data_asset.datasource.name}'"
+                    )
+                ]
+            )
 
-    def save(self) -> None:
-        self.data_asset._save_batch_definition(self)
+        try:
+            asset = datasource.get_asset(self.data_asset.name)
+        except LookupError:
+            asset = None
+        if not asset:
+            return BatchDefinitionFreshnessDiagnostics(
+                errors=[DataAssetNotFoundError(f"Could not find asset '{self.data_asset.name}'")]
+            )
+
+        batch_def: BatchDefinition | None
+        try:
+            batch_def = asset.get_batch_definition(self.name)
+        except KeyError:
+            batch_def = None
+        if not batch_def:
+            return BatchDefinitionFreshnessDiagnostics(
+                errors=[
+                    BatchDefinitionNotFoundError(f"Could not find batch definition '{self.name}'")
+                ]
+            )
+
+        return BatchDefinitionFreshnessDiagnostics(
+            errors=[] if self == batch_def else [BatchDefinitionNotFreshError(name=self.name)]
+        )
 
     def identifier_bundle(self) -> _EncodedValidationData:
         # Utilized as a custom json_encoder
+        diagnostics = self.is_fresh()
+        diagnostics.raise_for_error()
+
         asset = self.data_asset
         data_source = asset.datasource
 
@@ -90,7 +182,7 @@ class BatchDefinition(pydantic.GenericModel, Generic[PartitionerT]):
         )
         batch_definition_bundle = _IdentifierBundle(
             name=self.name,
-            id=self.id,
+            id=str(self.id) if self.id else None,
         )
 
         return _EncodedValidationData(

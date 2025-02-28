@@ -14,18 +14,17 @@ yaml = YAMLHandler()
 @pytest.fixture(scope="function")
 def totally_empty_data_context(tmp_path_factory):
     # NOTE: This sets up a DataContext with a real path and a config saved to that path.
-    # Now that BaseDataContext exists, it's possible to test most DataContext methods without touching the file system.  # noqa: E501
+    # Now that BaseDataContext exists, it's possible to test most DataContext methods without touching the file system.  # noqa: E501 # FIXME CoP
     # However, as of 2019/08/22, most tests still use filesystem-based fixtures.
     # TODO: Where appropriate, switch DataContext tests to the new method.
     project_root_dir = str(tmp_path_factory.mktemp("totally_empty_data_context"))
-    os.mkdir(  # noqa: PTH102
-        os.path.join(project_root_dir, FileDataContext.GX_DIR)  # noqa: PTH118
+    os.mkdir(  # noqa: PTH102 # FIXME CoP
+        os.path.join(project_root_dir, FileDataContext.GX_DIR)  # noqa: PTH118 # FIXME CoP
     )
 
     config = {
         "config_version": 3,
         "plugins_directory": "plugins/",
-        "suite_parameter_store_name": "not_a_real_store_name",
         "validation_results_store_name": "another_fake_store",
         "expectations_store_name": "expectations_store",
         "checkpoint_store_name": "checkpoint_store",
@@ -48,13 +47,13 @@ def totally_empty_data_context(tmp_path_factory):
         "data_docs_sites": {},
     }
     with open(
-        os.path.join(project_root_dir, "gx/great_expectations.yml"),  # noqa: PTH118
+        os.path.join(project_root_dir, "gx/great_expectations.yml"),  # noqa: PTH118 # FIXME CoP
         "w",
     ) as config_file:
         yaml.dump(config, config_file)
 
     context = gx.get_context(
-        context_root_dir=os.path.join(  # noqa: PTH118
+        context_root_dir=os.path.join(  # noqa: PTH118 # FIXME CoP
             project_root_dir, FileDataContext.GX_DIR
         )
     )
@@ -64,7 +63,7 @@ def totally_empty_data_context(tmp_path_factory):
 
 @pytest.mark.filesystem
 def test_add_store(totally_empty_data_context):
-    assert len(totally_empty_data_context.stores.keys()) == 5
+    assert len(totally_empty_data_context.stores.keys()) == 4
 
     totally_empty_data_context.add_store(
         "my_new_store",
@@ -74,7 +73,7 @@ def test_add_store(totally_empty_data_context):
         },
     )
     assert "my_new_store" in totally_empty_data_context.stores
-    assert len(totally_empty_data_context.stores.keys()) == 6
+    assert len(totally_empty_data_context.stores.keys()) == 5
 
 
 @pytest.mark.filesystem
@@ -85,7 +84,6 @@ def test_default_config_yml_stores(tmp_path_factory):
     assert set(context.stores.keys()) == {
         "expectations_store",
         "validation_results_store",
-        "suite_parameter_store",
         "checkpoint_store",
         "validation_definition_store",
     }
@@ -102,7 +100,6 @@ def test_default_config_yml_stores(tmp_path_factory):
         "checkpoint_store",
         "expectations_store",
         "validation_results_store",
-        "suite_parameter_store",
         "validation_definition_store",
         "my_new_validation_results_store",
     }

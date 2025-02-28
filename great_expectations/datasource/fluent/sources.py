@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 
     from great_expectations.compatibility import pydantic
     from great_expectations.data_context import AbstractDataContext as GXDataContext
+    from great_expectations.datasource.datasource_dict import DatasourceDict
     from great_expectations.datasource.fluent import PandasDatasource
     from great_expectations.datasource.fluent.interfaces import DataAsset, Datasource
     from great_expectations.validator.validator import Validator
@@ -75,14 +76,20 @@ class CrudMethodType(str, Enum):
 CrudMethodInfoFn: TypeAlias = Callable[..., Tuple[CrudMethodType, Type["Datasource"]]]
 
 
-class _SourceFactories:
+@public_api
+class DataSourceManager:
     """
-    Contains a collection of datasource factory methods in the format `.add_<TYPE_NAME>()`
+    Contains methods to interact with data sources from the gx context
 
-    Contains a `.type_lookup` dict-like two way mapping between previously registered `Datasource`
-    or `DataAsset` types and a simplified name for those types.
+    This contains a collection of dynamically generated datasource factory methods in the format
+    `.add_<TYPE_NAME>()`.
+
+    It also contains general data source manipulation methods such as `all()`, `get()` and
+    `delete()`.
     """
 
+    # A dict-like two way mapping between previously registered `Datasource` or `DataAsset` types
+    # and a simplified name for those types.
     type_lookup: ClassVar = TypeLookup()
     __crud_registry: ClassVar[Dict[str, CrudMethodInfoFn]] = {}
 
@@ -105,23 +112,26 @@ class _SourceFactories:
         Example
         -------
 
-        An `.add_pandas_filesystem()` pandas_filesystem factory method will be added to `context.sources`.
+        An `.add_pandas_filesystem()` pandas_filesystem factory method will be added to `context.data_sources`.
 
-        >>> class PandasFilesystemDatasource(_PandasDatasource):
+        >>> class PandasFilesystemDatasource(_PandasFilePathDatasource):
         >>>     type: str = 'pandas_filesystem'
         >>>     asset_types = [FileAsset]
         >>>     execution_engine: PandasExecutionEngine
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
 
         # TODO: check that the name is a valid python identifier (and maybe that it is snake_case?)
         ds_type_name = _get_field_details(ds_type, "type").default_value
         if not ds_type_name:
-            raise TypeRegistrationError(  # noqa: TRY003
+            raise TypeRegistrationError(  # noqa: TRY003 # FIXME CoP
                 f"`{ds_type.__name__}` is missing a `type` attribute with an assigned string value"
             )
 
         # rollback type registrations if exception occurs
-        with cls.type_lookup.transaction() as ds_type_lookup, ds_type._type_lookup.transaction() as asset_type_lookup:  # noqa: E501
+        with (
+            cls.type_lookup.transaction() as ds_type_lookup,
+            ds_type._type_lookup.transaction() as asset_type_lookup,
+        ):
             cls._register_assets(ds_type, asset_type_lookup=asset_type_lookup)
 
             cls._register_datasource(
@@ -142,7 +152,7 @@ class _SourceFactories:
         The method name is pulled from the `Datasource.type` attribute.
         """
         if ds_type in datasource_type_lookup:
-            raise TypeRegistrationError(  # noqa: TRY003
+            raise TypeRegistrationError(  # noqa: TRY003 # FIXME CoP
                 f"'{ds_type_name}' is already a registered typed and there can only be 1 type "
                 "for a given name."
             )
@@ -213,7 +223,7 @@ class _SourceFactories:
         crud_method_info.__name__ = crud_fn_name
         crud_method_info.__doc__ = crud_fn_doc
         if crud_fn_name in cls.__crud_registry:
-            raise TypeRegistrationError(  # noqa: TRY003
+            raise TypeRegistrationError(  # noqa: TRY003 # FIXME CoP
                 f"'`sources.{crud_fn_name}()` already exists",
             )
         logger.debug(f"Registering data_context.source.{crud_fn_name}()")
@@ -232,22 +242,22 @@ class _SourceFactories:
         for t in asset_types:
             if t.__name__.startswith("_"):
                 logger.debug(
-                    f"{t} is private, assuming not intended as a public concrete type. Skipping registration"  # noqa: E501
+                    f"{t} is private, assuming not intended as a public concrete type. Skipping registration"  # noqa: E501 # FIXME CoP
                 )
                 continue
             try:
                 asset_type_name = _get_field_details(t, "type").default_value
                 if asset_type_name is None:
-                    raise TypeError(  # noqa: TRY003, TRY301
+                    raise TypeError(  # noqa: TRY003, TRY301 # FIXME CoP
                         f"{t.__name__} `type` field must be assigned and cannot be `None`"
                     )
                 logger.debug(
-                    f"Registering `{ds_type.__name__}` `DataAsset` `{t.__name__}` as '{asset_type_name}'"  # noqa: E501
+                    f"Registering `{ds_type.__name__}` `DataAsset` `{t.__name__}` as '{asset_type_name}'"  # noqa: E501 # FIXME CoP
                 )
                 asset_type_lookup[t] = asset_type_name
             except (AttributeError, KeyError, TypeError) as bad_field_exc:
-                raise TypeRegistrationError(  # noqa: TRY003
-                    f"No `type` field found for `{ds_type.__name__}.asset_types` -> `{t.__name__}` unable to register asset type",  # noqa: E501
+                raise TypeRegistrationError(  # noqa: TRY003 # FIXME CoP
+                    f"No `type` field found for `{ds_type.__name__}.asset_types` -> `{t.__name__}` unable to register asset type",  # noqa: E501 # FIXME CoP
                 ) from bad_field_exc
 
             cls._bind_asset_factory_method_if_not_present(ds_type, t, asset_type_name)
@@ -264,7 +274,7 @@ class _SourceFactories:
 
         if not asset_factory_defined:
             logger.debug(
-                f"No `{add_asset_factory_method_name}()` method found for `{ds_type.__name__}` generating the method..."  # noqa: E501
+                f"No `{add_asset_factory_method_name}()` method found for `{ds_type.__name__}` generating the method..."  # noqa: E501 # FIXME CoP
             )
 
             def _add_asset_factory(self: Datasource, name: str, **kwargs) -> pydantic.BaseModel:
@@ -273,7 +283,7 @@ class _SourceFactories:
                 # push them to `connect_options` field
                 if self.data_connector_type:
                     logger.info(
-                        f"'{self.name}' {type(self).__name__} uses {self.data_connector_type.__name__}"  # noqa: E501
+                        f"'{self.name}' {type(self).__name__} uses {self.data_connector_type.__name__}"  # noqa: E501 # FIXME CoP
                     )
                     connect_options = {
                         k: v
@@ -282,7 +292,7 @@ class _SourceFactories:
                     }
                     if connect_options:
                         logger.info(
-                            f"{self.data_connector_type.__name__} connect_options provided -> {list(connect_options.keys())}"  # noqa: E501
+                            f"{self.data_connector_type.__name__} connect_options provided -> {list(connect_options.keys())}"  # noqa: E501 # FIXME CoP
                         )
                         for k in connect_options:  # TODO: avoid this extra loop
                             kwargs.pop(k)
@@ -297,41 +307,53 @@ class _SourceFactories:
 
             # attr-defined issue
             # https://github.com/python/mypy/issues/12472
-            _add_asset_factory.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+            _add_asset_factory.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
                 _add_asset_factory, asset_type, exclude={"type"}
             )
             _add_asset_factory.__name__ = add_asset_factory_method_name
             setattr(ds_type, add_asset_factory_method_name, _add_asset_factory)
 
+            # NOTE: Please review what this looks like in our Public API docs preview before merging
+            _add_asset_factory.__doc__ = DataSourceManager._build_add_asset_docstring(
+                asset_type_name
+            )
+
             # add the public api decorator
             public_api(getattr(ds_type, add_asset_factory_method_name))
 
-            def _read_asset_factory(
-                self: Datasource, asset_name: str | None = None, **kwargs
-            ) -> Validator:
-                name = asset_name or DEFAULT_PANDAS_DATA_ASSET_NAME
-                asset = asset_type(name=name, **kwargs)
-                self._add_asset(asset)
-                batch_request = asset.build_batch_request()
-                # TODO: raise error if `_data_context` not set
-                return self._data_context.get_validator(batch_request=batch_request)  # type: ignore[union-attr] # self._data_context must be set
+            if getattr(ds_type, "ADD_READER_METHODS", False):
 
-            _read_asset_factory.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
-                _read_asset_factory, asset_type, exclude={"type"}
-            )
-            read_asset_factory_method_name = f"read_{asset_type_name}"
-            setattr(ds_type, read_asset_factory_method_name, _read_asset_factory)
+                def _read_asset_factory(
+                    self: Datasource, asset_name: str | None = None, **kwargs
+                ) -> Validator:
+                    name = asset_name or DEFAULT_PANDAS_DATA_ASSET_NAME
+                    asset = asset_type(name=name, **kwargs)
+                    self._add_asset(asset)
+                    batch_request = asset.build_batch_request()
+                    # TODO: raise error if `_data_context` not set
+                    return self._data_context.get_validator(batch_request=batch_request)  # type: ignore[union-attr] # self._data_context must be set
+
+                _read_asset_factory.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
+                    _read_asset_factory, asset_type, exclude={"type"}
+                )
+                read_asset_factory_method_name = f"read_{asset_type_name}"
+                setattr(ds_type, read_asset_factory_method_name, _read_asset_factory)
 
         else:
             logger.debug(
                 f"`{add_asset_factory_method_name}()` already defined `{ds_type.__name__}`"
             )
 
+    @staticmethod
+    def _build_add_asset_docstring(asset_type_name: str) -> str:
+        article = "an" if asset_type_name[0].lower() in "aeiou" else "a"
+        return f"""Add {article} {asset_type_name} asset to the datasource."""
+
     @property
     def pandas_default(self) -> PandasDatasource:
         from great_expectations.datasource.fluent import PandasDatasource
 
-        datasources = self._data_context.datasources
+        datasources = self.all()
 
         # if a legacy datasource with this name already exists, we try a different name
         existing_datasource = datasources.get(DEFAULT_PANDAS_DATASOURCE_NAME)
@@ -342,7 +364,7 @@ class _SourceFactories:
         if isinstance(existing_datasource, PandasDatasource):
             return existing_datasource
 
-        raise DefaultPandasDatasourceError(  # noqa: TRY003
+        raise DefaultPandasDatasourceError(  # noqa: TRY003 # FIXME CoP
             "Another non-pandas datasource already exists "
             f'with the name: "{DEFAULT_PANDAS_DATASOURCE_NAME}". '
             "Please rename this datasources if you wish "
@@ -357,13 +379,13 @@ class _SourceFactories:
         self, name: str, datasource_type: Type[Datasource], raise_if_none: bool = True
     ) -> None:
         try:
-            current_datasource = self._data_context.get_datasource(name)
-        except ValueError as e:
+            current_datasource = self._data_context.data_sources.get(name)
+        except KeyError as e:
             if raise_if_none:
-                raise ValueError(f"There is no datasource {name} in the data context.") from e  # noqa: TRY003
+                raise ValueError(f"There is no datasource {name} in the data context.") from e  # noqa: TRY003 # FIXME CoP
             current_datasource = None
         if current_datasource and not isinstance(current_datasource, datasource_type):
-            raise ValueError(  # noqa: TRY003
+            raise ValueError(  # noqa: TRY003 # FIXME CoP
                 f"Trying to update datasource {name} but it is not the correct type. "
                 f"Expected {datasource_type.__name__} but got {type(current_datasource).__name__}"
             )
@@ -380,16 +402,16 @@ class _SourceFactories:
         datasource: Optional[Datasource] = None
         if name_or_datasource and isinstance(name_or_datasource, Datasource):
             if len(kwargs) != 0:
-                raise ValueError(  # noqa: TRY003
+                raise ValueError(  # noqa: TRY003 # FIXME CoP
                     f"The datasource must be the sole argument. We also received: {kwargs}"
                 )
             datasource = name_or_datasource
         elif name_or_datasource is None and "datasource" in kwargs:
             if len(kwargs) != 1:
-                raise ValueError(f"The datasource must be the sole argument. We received: {kwargs}")  # noqa: TRY003
+                raise ValueError(f"The datasource must be the sole argument. We received: {kwargs}")  # noqa: TRY003 # FIXME CoP
             datasource = kwargs["datasource"]
         if datasource and not isinstance(datasource, datasource_type):
-            raise ValueError(  # noqa: TRY003
+            raise ValueError(  # noqa: TRY003 # FIXME CoP
                 f"Trying to modify datasource {datasource.name} but it is not the correct type. "
                 f"Expected {datasource_type} but got {type(datasource)}"
             )
@@ -423,10 +445,10 @@ class _SourceFactories:
         if new_datasource:
             return new_datasource
         if (
-            name_or_datasource and isinstance(name_or_datasource, str) and "name" not in "kwargs"  # noqa: PLR0133
+            name_or_datasource and isinstance(name_or_datasource, str) and "name" not in "kwargs"  # noqa: PLR0133 # FIXME CoP
         ) or (name_or_datasource is None and "name" in kwargs and isinstance(kwargs["name"], str)):
             return None
-        raise ValueError(  # noqa: TRY003
+        raise ValueError(  # noqa: TRY003 # FIXME CoP
             "A datasource object or a name string must be present. The datasource or "
             "name can be passed in as the first and only positional argument or can be"
             "can be passed in as keyword arguments. The arguments we received were: "
@@ -458,7 +480,7 @@ class _SourceFactories:
 
         add_datasource.__doc__ = doc_string
         # attr-defined issue https://github.com/python/mypy/issues/12472
-        add_datasource.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+        add_datasource.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
             add_datasource,
             datasource_type,
             exclude={"type", "assets"},
@@ -493,9 +515,7 @@ class _SourceFactories:
             )
 
             # preserve any pre-existing id for usage with cloud
-            id_: uuid.UUID | None = getattr(
-                self._data_context.datasources.get(datasource_name), "id", None
-            )
+            id_: uuid.UUID | None = getattr(self.all().get(datasource_name), "id", None)
             if id_:
                 updated_datasource.id = id_
 
@@ -507,7 +527,7 @@ class _SourceFactories:
 
         update_datasource.__doc__ = doc_string
         # attr-defined issue https://github.com/python/mypy/issues/12472
-        update_datasource.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+        update_datasource.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
             update_datasource,
             datasource_type,
             exclude={"type", "assets"},
@@ -534,7 +554,7 @@ class _SourceFactories:
                 else datasource_type(**kwargs)
             )
 
-            # if new_datasource is None that means name is defined as name_or_datasource or as a kwarg  # noqa: E501
+            # if new_datasource is None that means name is defined as name_or_datasource or as a kwarg  # noqa: E501 # FIXME CoP
             datasource_name: str = new_datasource.name
             logger.debug(f"Adding or updating {datasource_type.__name__} with '{datasource_name}'")
             self._validate_current_datasource_type(
@@ -542,15 +562,13 @@ class _SourceFactories:
             )
 
             # preserve any pre-existing id for usage with cloud
-            id_: uuid.UUID | None = getattr(
-                self._data_context.datasources.get(datasource_name), "id", None
-            )
+            id_: uuid.UUID | None = getattr(self.all().get(datasource_name), "id", None)
             if id_:
                 new_datasource.id = id_
 
             new_datasource._data_context = self._data_context
             new_datasource.test_connection()
-            if datasource_name in self._data_context.datasources:
+            if datasource_name in self.all():
                 return_obj = self._data_context._update_fluent_datasource(datasource=new_datasource)
             else:
                 return_obj = self._data_context._add_fluent_datasource(datasource=new_datasource)
@@ -559,7 +577,7 @@ class _SourceFactories:
 
         add_or_update_datasource.__doc__ = doc_string
         # attr-defined issue https://github.com/python/mypy/issues/12472
-        add_or_update_datasource.__signature__ = _merge_signatures(  # type: ignore[attr-defined]
+        add_or_update_datasource.__signature__ = _merge_signatures(  # type: ignore[attr-defined] # FIXME CoP
             add_or_update_datasource,
             datasource_type,
             exclude={"type", "assets"},
@@ -575,12 +593,12 @@ class _SourceFactories:
         def delete_datasource(name: str) -> None:
             logger.debug(f"Delete {datasource_type} with {name}")
             self._validate_current_datasource_type(name, datasource_type)
-            self._data_context._delete_fluent_datasource(datasource_name=name)
+            self._data_context._delete_fluent_datasource(name=name)
             self._data_context._save_project_config()
 
         delete_datasource.__doc__ = doc_string
         # attr-defined issue https://github.com/python/mypy/issues/12472
-        delete_datasource.__signature__ = inspect.signature(delete_datasource)  # type: ignore[attr-defined]
+        delete_datasource.__signature__ = inspect.signature(delete_datasource)  # type: ignore[attr-defined] # FIXME CoP
         return delete_datasource
 
     @public_api
@@ -591,7 +609,24 @@ class _SourceFactories:
         Args:
             name: The name of the given datasource.
         """
-        self._data_context.delete_datasource(datasource_name=name)
+        self._data_context.delete_datasource(name=name)
+
+    @public_api
+    def all(self) -> DatasourceDict:
+        """Get all Datasources."""
+        return self._data_context._datasources
+
+    @public_api
+    def get(self, name: str) -> Datasource:
+        """Get a Datasource from the collection by name.
+
+        Parameters:
+            name: Name of Datasource to get
+
+        Raises:
+            KeyError: when Datasource is not found.
+        """
+        return self.all()[name]
 
     def __getattr__(self, attr_name: str):
         try:
@@ -607,16 +642,16 @@ class _SourceFactories:
             elif crud_method_type == CrudMethodType.DELETE:
                 # deprecated-v0.17.2
                 warnings.warn(
-                    f"`{attr_name}` is deprecated as of v0.17.2 and will be removed in v0.19. Please use `.sources.delete` moving forward.",  # noqa: E501
+                    f"`{attr_name}` is deprecated as of v0.17.2 and will be removed in v0.19. Please use `.sources.delete` moving forward.",  # noqa: E501 # FIXME CoP
                     DeprecationWarning,
                 )
                 return self.create_delete_crud_method(datasource_type, docstring)
             else:
-                raise TypeRegistrationError(  # noqa: TRY003
+                raise TypeRegistrationError(  # noqa: TRY003 # FIXME CoP
                     f"Unknown crud method registered for {attr_name} with type {crud_method_type}"
                 )
         except KeyError as e:
-            raise AttributeError(f"No crud method '{attr_name}' in {self.factories}") from e  # noqa: TRY003
+            raise AttributeError(f"No crud method '{attr_name}' in {self.factories}") from e  # noqa: TRY003 # FIXME CoP
 
     @override
     def __dir__(self) -> List[str]:
@@ -631,8 +666,8 @@ def _iter_all_registered_types(
     Iterate through all registered Datasource and DataAsset types.
     Returns tuples of the registered type name and the actual type/class.
     """
-    for ds_name in _SourceFactories.type_lookup.type_names():
-        ds_type: Type[Datasource] = _SourceFactories.type_lookup[ds_name]
+    for ds_name in DataSourceManager.type_lookup.type_names():
+        ds_type: Type[Datasource] = DataSourceManager.type_lookup[ds_name]
         if include_datasource:
             yield ds_name, ds_type
 

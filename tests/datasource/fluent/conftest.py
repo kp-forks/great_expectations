@@ -33,13 +33,14 @@ from great_expectations.core.batch_spec import (
     BatchMarkers,
     SqlAlchemyDatasourceBatchSpec,
 )
-from great_expectations.data_context import FileDataContext
+from great_expectations.data_context import EphemeralDataContext, FileDataContext
 from great_expectations.data_context.data_context.abstract_data_context import AbstractDataContext
 from great_expectations.datasource.fluent import (
     PandasAzureBlobStorageDatasource,
     PandasGoogleCloudStorageDatasource,
     SparkAzureBlobStorageDatasource,
     SparkGoogleCloudStorageDatasource,
+    SQLDatasource,
 )
 from great_expectations.datasource.fluent.config import GxConfig
 from great_expectations.datasource.fluent.interfaces import Datasource
@@ -47,7 +48,8 @@ from great_expectations.datasource.fluent.pandas_filesystem_datasource import (
     PandasFilesystemDatasource,
 )
 from great_expectations.datasource.fluent.postgres_datasource import PostgresDatasource
-from great_expectations.datasource.fluent.sources import _SourceFactories
+from great_expectations.datasource.fluent.sources import DataSourceManager
+from great_expectations.datasource.fluent.sql_datasource import TableAsset
 from great_expectations.execution_engine import (
     ExecutionEngine,
     SqlAlchemyExecutionEngine,
@@ -68,13 +70,15 @@ if TYPE_CHECKING:
 
     from great_expectations.data_context import CloudDataContext
 
+
 CreateSourceFixture: TypeAlias = Callable[..., ContextManager[PostgresDatasource]]
 FLUENT_DATASOURCE_TEST_DIR: Final = pathlib.Path(__file__).parent
 PG_CONFIG_YAML_FILE: Final = FLUENT_DATASOURCE_TEST_DIR / FileDataContext.GX_YML
 _DEFAULT_TEST_YEARS = list(range(2021, 2023))
 _DEFAULT_TEST_MONTHS = list(range(1, 13))
 
-logger = logging.getLogger(__name__)
+
+CNF_TEST_LOGGER: Final[logging.Logger] = logging.getLogger(__name__)
 
 
 def sqlachemy_execution_engine_mock_cls(
@@ -91,24 +95,24 @@ def sqlachemy_execution_engine_mock_cls(
         partitioner_query_response: An optional list of dictionaries. Each dictionary is a row returned
             from the partitioner query. The keys are the column names and the value is the column values,
             eg: [{'year': 2021, 'month': 1}, {'year': 2021, 'month': 2}]
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     class MockSqlAlchemyExecutionEngine(SqlAlchemyExecutionEngine):
         def __init__(self, create_temp_table: bool = True, *args, **kwargs):
-            # We should likely let the user pass in an engine. In a SqlAlchemyExecutionEngine used in  # noqa: E501
+            # We should likely let the user pass in an engine. In a SqlAlchemyExecutionEngine used in  # noqa: E501 # FIXME CoP
             # non-mocked code the engine property is of the type:
             # from sqlalchemy.engine import Engine as SaEngine
-            self.engine = MockSaEngine(dialect=Dialect(dialect))
+            self.engine = MockSaEngine(dialect=Dialect(dialect))  # type: ignore[assignment] # FIXME CoP
             self._create_temp_table = create_temp_table
 
         @override
-        def get_batch_data_and_markers(  # type: ignore[override]
+        def get_batch_data_and_markers(  # type: ignore[override] # FIXME CoP
             self, batch_spec: SqlAlchemyDatasourceBatchSpec
         ) -> tuple[BatchData, BatchMarkers]:
             validate_batch_spec(batch_spec)
             return BatchData(self), BatchMarkers(ge_load_time=None)
 
-        def execute_partitioned_query(self, partitioned_query):
+        def execute_partitioned_query(self, partitioned_query):  # type: ignore[explicit-override] # FIXME
             class Row:
                 def __init__(self, attributes):
                     for k, v in attributes.items():
@@ -117,7 +121,7 @@ def sqlachemy_execution_engine_mock_cls(
             # We know that partitioner_query_response is non-empty because of validation
             # at the top of the outer function.
             # In some cases, such as in the datetime partitioners,
-            # a dictionary is returned our from out partitioner query with the key as the parameter_name.  # noqa: E501
+            # a dictionary is returned our from out partitioner query with the key as the parameter_name.  # noqa: E501 # FIXME CoP
             # Otherwise, a list of values is returned.
             if isinstance(partitioner_query_response[0], dict):
                 return [Row(row_dict) for row_dict in partitioner_query_response]
@@ -131,7 +135,7 @@ class ExecutionEngineDouble(ExecutionEngine):
         pass
 
     @override
-    def get_batch_data_and_markers(self, batch_spec) -> tuple[BatchData, BatchMarkers]:  # type: ignore[override]
+    def get_batch_data_and_markers(self, batch_spec) -> tuple[BatchData, BatchMarkers]:  # type: ignore[override] # FIXME CoP
         return BatchData(self), BatchMarkers(ge_load_time=None)
 
 
@@ -145,7 +149,7 @@ def inject_engine_lookup_double(
     Dynamically create a new subclass so that runtime type validation does not fail.
     """
     original_engine_override: dict[Type[Datasource], Type[ExecutionEngine]] = {}
-    for key in _SourceFactories.type_lookup:
+    for key in DataSourceManager.type_lookup:
         if issubclass(type(key), Datasource):
             original_engine_override[key] = key.execution_engine_override
 
@@ -184,7 +188,7 @@ def seed_ds_env_vars(
 
     for name, value in config_sub_dict.items():
         monkeypatch.setenv(name, value)
-        logger.info(f"Setting ENV - {name} = '{value}'")
+        CNF_TEST_LOGGER.info(f"Setting ENV - {name} = '{value}'")
 
     # return as tuple of tuples so that the return value is immutable and therefore cacheable
     return tuple((k, v) for k, v in config_sub_dict.items())
@@ -209,7 +213,7 @@ def file_dc_config_dir_init(tmp_path: pathlib.Path) -> pathlib.Path:
     assert gx_yml.exists()
 
     tmp_gx_dir = gx_yml.parent.absolute()
-    logger.info(f"tmp_gx_dir -> {tmp_gx_dir}")
+    CNF_TEST_LOGGER.info(f"tmp_gx_dir -> {tmp_gx_dir}")
     return tmp_gx_dir
 
 
@@ -275,7 +279,9 @@ _CLIENT_DUMMY = _TestClientDummy()
 
 
 def _get_test_client_dummy(*args, **kwargs) -> _TestClientDummy:
-    logger.debug(f"_get_test_client_dummy() called with \nargs: {pf(args)}\nkwargs: {pf(kwargs)}")
+    CNF_TEST_LOGGER.debug(
+        f"_get_test_client_dummy() called with \nargs: {pf(args)}\nkwargs: {pf(kwargs)}"
+    )
     return _CLIENT_DUMMY
 
 
@@ -317,12 +323,15 @@ def cloud_storage_get_client_doubles(
     azure_get_client_dummy,
 ):
     """
-    Patches Datasources that rely on a private _get_*_client() method to return test doubles instead.
+    Patches Datasources that rely on a private _get_*_client() method to return test doubles
+    instead.
 
     gcs
     azure
-    """  # noqa: E501
-    logger.warning("Patching cloud storage _get_*_client() methods to return client test doubles")
+    """
+    CNF_TEST_LOGGER.warning(
+        "Patching cloud storage _get_*_client() methods to return client test doubles"
+    )
 
 
 @pytest.fixture
@@ -358,7 +367,7 @@ def fluent_yaml_config_file(
         yaml_string = "\n# Fluent\n" + fluent_gx_config_yml_str
         f_append.write(yaml_string)
 
-    logger.debug(f"  Config File Text\n-----------\n{config_file_path.read_text()}")
+    CNF_TEST_LOGGER.debug(f"  Config File Text\n-----------\n{config_file_path.read_text()}")
     return config_file_path
 
 
@@ -390,7 +399,7 @@ def seed_cloud(
     _CLOUD_API_FAKE_DB.update(fake_db_data)
 
     seeded_datasources = _CLOUD_API_FAKE_DB["data-context-configuration"]["datasources"]
-    logger.info(f"Seeded Datasources ->\n{pf(seeded_datasources, depth=2)}")
+    CNF_TEST_LOGGER.info(f"Seeded Datasources ->\n{pf(seeded_datasources, depth=2)}")
     assert seeded_datasources
 
     yield cloud_api_fake
@@ -457,9 +466,9 @@ def _source(
         dialect=dialect,
         partitioner_query_response=partitioner_response,
     )
-    original_override = PostgresDatasource.execution_engine_override  # type: ignore[misc]
+    original_override = PostgresDatasource.execution_engine_override  # type: ignore[misc] # FIXME CoP
     try:
-        PostgresDatasource.execution_engine_override = execution_eng_cls  # type: ignore[misc]
+        PostgresDatasource.execution_engine_override = execution_eng_cls  # type: ignore[misc] # FIXME CoP
         postgres_datasource = PostgresDatasource(
             name="my_datasource",
             connection_string=connection_string,
@@ -469,11 +478,32 @@ def _source(
             postgres_datasource._data_context = data_context
         yield postgres_datasource
     finally:
-        PostgresDatasource.execution_engine_override = original_override  # type: ignore[misc]
+        PostgresDatasource.execution_engine_override = original_override  # type: ignore[misc] # FIXME CoP
 
 
 # We may be able to parameterize this fixture so we can instantiate _source in the fixture.
 # This would reduce the `with ...` boilerplate in the individual tests.
 @pytest.fixture
 def create_source() -> ContextManager:
-    return _source  # type: ignore[return-value]
+    return _source  # type: ignore[return-value] # FIXME CoP
+
+
+@pytest.fixture
+def sql_datasource_table_asset_test_connection_noop(
+    ephemeral_context_with_defaults: EphemeralDataContext,
+    monkeypatch: pytest.MonkeyPatch,
+    filter_gx_datasource_warnings: None,
+) -> SQLDatasource:
+    """
+    SQLDatasource instance where `TableAsset.test_connection()` always passes.
+    """
+    sql_datasource = ephemeral_context_with_defaults.data_sources.add_sql(
+        name="my_sql_datasource", connection_string="sqlite:///"
+    )
+    CNF_TEST_LOGGER.warning(f"Patching {sql_datasource.name} `.test_connection()` to a noop")
+
+    def noop(self: SQLDatasource | TableAsset):
+        CNF_TEST_LOGGER.warning(f"{self.__class__.__name__}.test_connection noop called")
+
+    monkeypatch.setattr(TableAsset, "test_connection", noop, raising=True)
+    return sql_datasource

@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Type, Union
 
+from great_expectations.compatibility import pydantic
 from great_expectations.compatibility.typing_extensions import override
-from great_expectations.core.suite_parameters import (
-    SuiteParameterDict,  # noqa: TCH001
-)
+from great_expectations.core.types import Comparable  # noqa: TCH001 # FIXME CoP
 from great_expectations.expectations.expectation import (
     BatchExpectation,
     render_suite_parameter_string,
 )
+from great_expectations.expectations.metadata_types import DataQualityIssues
 from great_expectations.render import LegacyRendererType, RenderedStringTemplateContent
 from great_expectations.render.renderer.renderer import renderer
 from great_expectations.render.renderer_configuration import (
@@ -32,7 +31,7 @@ if TYPE_CHECKING:
     )
     from great_expectations.render.renderer_configuration import AddParamArgs
 
-EXPECTATION_SHORT_DESCRIPTION = "Expect the number of columns to be between two values."
+EXPECTATION_SHORT_DESCRIPTION = "Expect the number of columns in a table to be between two values."
 MIN_VALUE_DESCRIPTION = "The minimum number of columns, inclusive."
 MAX_VALUE_DESCRIPTION = "The maximum number of columns, inclusive."
 SUPPORTED_DATA_SOURCES = [
@@ -42,18 +41,18 @@ SUPPORTED_DATA_SOURCES = [
     "PostgreSQL",
     "MySQL",
     "MSSQL",
-    "Redshift",
     "BigQuery",
     "Snowflake",
+    "Databricks (SQL)",
 ]
-DATA_QUALITY_ISSUES = ["Schema"]
+DATA_QUALITY_ISSUES = [DataQualityIssues.SCHEMA.value]
 
 
 class ExpectTableColumnCountToBeBetween(BatchExpectation):
     __doc__ = f"""{EXPECTATION_SHORT_DESCRIPTION}
 
-    expect_table_column_count_to_be_between is a \
-    [Batch Expectation](https://docs.greatexpectations.io/docs/guides/expectations/creating_custom_expectations/how_to_create_custom_batch_expectations).
+    ExpectTableColumnCountToBeBetween is a \
+    Batch Expectation.
 
     BatchExpectations are one of the most common types of Expectation.
     They are evaluated for an entire Batch, and answer a semantic question about the Batch itself.
@@ -86,9 +85,9 @@ class ExpectTableColumnCountToBeBetween(BatchExpectation):
           has no maximum.
 
     See Also:
-        [expect_table_column_count_to_equal](https://greatexpectations.io/expectations/expect_table_column_count_to_equal)
+        [ExpectTableColumnCountToEqual](https://greatexpectations.io/expectations/expect_table_column_count_to_equal)
 
-    Supported Datasources:
+    Supported Data Sources:
         [{SUPPORTED_DATA_SOURCES[0]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[1]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[2]}](https://docs.greatexpectations.io/docs/application_integration_support/)
@@ -99,7 +98,7 @@ class ExpectTableColumnCountToBeBetween(BatchExpectation):
         [{SUPPORTED_DATA_SOURCES[7]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[8]}](https://docs.greatexpectations.io/docs/application_integration_support/)
 
-    Data Quality Category:
+    Data Quality Issues:
         {DATA_QUALITY_ISSUES[0]}
 
     Example Data:
@@ -112,7 +111,7 @@ class ExpectTableColumnCountToBeBetween(BatchExpectation):
         Passing Case:
             Input:
                 ExpectTableColumnCountToBeBetween(
-                    min_value=1
+                    min_value=1,
                     max_value=3
             )
 
@@ -149,10 +148,10 @@ class ExpectTableColumnCountToBeBetween(BatchExpectation):
                   "meta": {{}},
                   "success": false
                 }}
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
-    min_value: Union[float, SuiteParameterDict, datetime, None]
-    max_value: Union[float, SuiteParameterDict, datetime, None]
+    min_value: Optional[Comparable] = pydantic.Field(description=MIN_VALUE_DESCRIPTION)
+    max_value: Optional[Comparable] = pydantic.Field(description=MAX_VALUE_DESCRIPTION)
 
     library_metadata: ClassVar[Dict[str, Union[str, list, bool]]] = {
         "maturity": "production",
@@ -177,6 +176,8 @@ class ExpectTableColumnCountToBeBetween(BatchExpectation):
     )
 
     class Config:
+        title = "Expect table column count to be between"
+
         @staticmethod
         def schema_extra(
             schema: Dict[str, Any], model: Type[ExpectTableColumnCountToBeBetween]
@@ -281,6 +282,8 @@ class ExpectTableColumnCountToBeBetween(BatchExpectation):
                 template_str = f"Must have {at_most_str} $max_value columns."
             elif params["max_value"] is None:
                 template_str = f"Must have {at_least_str} $min_value columns."
+            else:
+                raise ValueError("unresolvable template_str")  # noqa: TRY003 # FIXME CoP
 
         return [
             RenderedStringTemplateContent(

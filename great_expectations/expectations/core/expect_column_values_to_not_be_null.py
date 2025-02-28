@@ -14,6 +14,7 @@ from great_expectations.expectations.expectation import (
 from great_expectations.expectations.expectation_configuration import (
     parse_result_format,
 )
+from great_expectations.expectations.metadata_types import DataQualityIssues
 from great_expectations.expectations.model_field_descriptions import (
     COLUMN_DESCRIPTION,
     MOSTLY_DESCRIPTION,
@@ -53,11 +54,11 @@ SUPPORTED_DATA_SOURCES = [
     "PostgreSQL",
     "MySQL",
     "MSSQL",
-    "Redshift",
     "BigQuery",
     "Snowflake",
+    "Databricks (SQL)",
 ]
-DATA_QUALITY_ISSUES = ["Missingness"]
+DATA_QUALITY_ISSUES = [DataQualityIssues.COMPLETENESS.value]
 
 
 class ExpectColumnValuesToNotBeNull(ColumnMapExpectation):
@@ -66,8 +67,8 @@ class ExpectColumnValuesToNotBeNull(ColumnMapExpectation):
     To be counted as an exception, values must be explicitly null or missing, such as a NULL in PostgreSQL or an
     np.NaN in pandas. Empty strings don't count as null unless they have been coerced to a null type.
 
-    expect_column_values_to_not_be_null is a \
-    [Column Map Expectation](https://docs.greatexpectations.io/docs/guides/expectations/creating_custom_expectations/how_to_create_custom_column_map_expectations).
+    ExpectColumnValuesToNotBeNull is a \
+    Column Map Expectation.
 
     Column Map Expectations are one of the most common types of Expectation.
     They are evaluated for a single column and ask a yes/no question for every row in that column.
@@ -97,9 +98,9 @@ class ExpectColumnValuesToNotBeNull(ColumnMapExpectation):
         Exact fields vary depending on the values passed to result_format, catch_exceptions, and meta.
 
     See Also:
-        [expect_column_values_to_be_null](https://greatexpectations.io/expectations/expect_column_values_to_be_null)
+        [ExpectColumnValuesToBeNull](https://greatexpectations.io/expectations/expect_column_values_to_be_null)
 
-    Supported Datasources:
+    Supported Data Sources:
         [{SUPPORTED_DATA_SOURCES[0]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[1]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[2]}](https://docs.greatexpectations.io/docs/application_integration_support/)
@@ -110,7 +111,7 @@ class ExpectColumnValuesToNotBeNull(ColumnMapExpectation):
         [{SUPPORTED_DATA_SOURCES[7]}](https://docs.greatexpectations.io/docs/application_integration_support/)
         [{SUPPORTED_DATA_SOURCES[8]}](https://docs.greatexpectations.io/docs/application_integration_support/)
 
-    Data Quality Category:
+    Data Quality Issues:
         {DATA_QUALITY_ISSUES[0]}
 
     Example Data:
@@ -171,7 +172,7 @@ class ExpectColumnValuesToNotBeNull(ColumnMapExpectation):
                   "meta": {{}},
                   "success": false
                 }}
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     library_metadata: ClassVar[Dict[str, Union[str, list, bool]]] = {
         "maturity": "production",
@@ -187,6 +188,8 @@ class ExpectColumnValuesToNotBeNull(ColumnMapExpectation):
     args_keys: ClassVar[Tuple[str, ...]] = ("column",)
 
     class Config:
+        title = "Expect column values to not be null"
+
         @staticmethod
         def schema_extra(
             schema: Dict[str, Any], model: Type[ExpectColumnValuesToNotBeNull]
@@ -275,7 +278,7 @@ class ExpectColumnValuesToNotBeNull(ColumnMapExpectation):
                 )
             else:
                 template_str = "values must not be null, at least $mostly_pct % of the time."
-        else:  # noqa: PLR5501
+        else:  # noqa: PLR5501 # FIXME CoP
             if include_column_name:
                 template_str = "$column values must never be null."
             else:

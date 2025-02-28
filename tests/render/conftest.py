@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import json
 import os
+from typing import TYPE_CHECKING
 
 import pytest
-import pytest_mock
 
 import great_expectations as gx
 from great_expectations.checkpoint.checkpoint import Checkpoint, CheckpointResult
@@ -15,22 +17,29 @@ from great_expectations.data_context.types.resource_identifiers import Validatio
 from great_expectations.data_context.util import file_relative_path
 from great_expectations.self_check.util import expectationSuiteValidationResultSchema
 
+if TYPE_CHECKING:
+    import pytest_mock
+
+    from great_expectations.core.expectation_validation_result import (
+        ExpectationSuiteValidationResult,
+    )
+
 
 @pytest.fixture(scope="module")
-def empty_data_context_module_scoped(tmp_path_factory):
+def empty_data_context_module_scoped(tmp_path_factory) -> FileDataContext:
     # Re-enable GE_USAGE_STATS
     project_path = str(tmp_path_factory.mktemp("empty_data_context"))
     context = gx.data_context.FileDataContext.create(project_path)
-    context_path = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118
-    asset_config_path = os.path.join(context_path, "expectations")  # noqa: PTH118
-    os.makedirs(asset_config_path, exist_ok=True)  # noqa: PTH103
+    context_path = os.path.join(project_path, FileDataContext.GX_DIR)  # noqa: PTH118 # FIXME CoP
+    asset_config_path = os.path.join(context_path, "expectations")  # noqa: PTH118 # FIXME CoP
+    os.makedirs(asset_config_path, exist_ok=True)  # noqa: PTH103 # FIXME CoP
     return context
 
 
 @pytest.fixture
-def titanic_profiled_name_column_evrs():
+def titanic_profiled_name_column_evrs() -> ExpectationSuiteValidationResult:
     # This is a janky way to fetch expectations matching a specific name from an EVR suite.
-    # TODO: It will no longer be necessary once we implement ValidationResultSuite._group_evrs_by_column  # noqa: E501
+    # TODO: It will no longer be necessary once we implement ValidationResultSuite._group_evrs_by_column  # noqa: E501 # FIXME CoP
     from great_expectations.render.renderer.renderer import Renderer
 
     with open(
@@ -53,6 +62,7 @@ def v1_checkpoint_result(mocker: pytest_mock.MockFixture):
         statistics={"successful_expectations": 3, "evaluated_expectations": 5},
         batch_id="my_batch",
         success=False,
+        result_url=None,
     )
     result_a.asset_name = "my_first_asset"
     result_b = mocker.MagicMock(
@@ -62,6 +72,7 @@ def v1_checkpoint_result(mocker: pytest_mock.MockFixture):
         statistics={"successful_expectations": 1, "evaluated_expectations": 1},
         batch_id="my_other_batch",
         success=True,
+        result_url=None,
     )
     result_b.asset_name = None
 

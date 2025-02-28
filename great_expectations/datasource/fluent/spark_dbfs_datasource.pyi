@@ -24,16 +24,15 @@ from great_expectations.datasource.fluent.interfaces import (
 logger: Logger
 
 class SparkDBFSDatasource(SparkFilesystemDatasource):
-    type: Literal["spark_dbfs"]  # type: ignore[assignment]
+    type: Literal["spark_dbfs"]  # type: ignore[assignment] # FIXME CoP
 
     @override
-    def add_csv_asset(  # noqa: PLR0913
+    def add_csv_asset(  # noqa: PLR0913 # FIXME CoP
         self,
         name: str,
         *,
         batch_metadata: Optional[BatchMetadata] = ...,
         glob_directive: str = "**/*",
-        order_by: Optional[SortersDefinition] = ...,
         # vvv spark parameters for pyspark.sql.DataFrameReader.csv() (ordered as in pyspark v3.4.0)
         # path: PathOrPaths,
         # NA - path determined by asset

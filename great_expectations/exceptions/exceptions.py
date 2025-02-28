@@ -20,6 +20,16 @@ class GreatExpectationsError(Exception):
         super().__init__(message)
 
 
+class GreatExpectationsAggregateError(ValueError):
+    def __init__(self, errors: list[GreatExpectationsError]) -> None:
+        self._errors = errors
+        super().__init__("\n\t" + "\n\t".join(str(e) for e in errors))
+
+    @property
+    def errors(self) -> list[GreatExpectationsError]:
+        return self._errors
+
+
 class GreatExpectationsValidationError(ValidationError, GreatExpectationsError):
     def __init__(self, message, validation_error=None) -> None:
         self.message = message
@@ -34,12 +44,6 @@ class GreatExpectationsValidationError(ValidationError, GreatExpectationsError):
         return self.message
 
 
-class SuiteEditNotebookCustomTemplateModuleNotFoundError(ModuleNotFoundError):
-    def __init__(self, custom_module) -> None:
-        message = f"The custom module '{custom_module}' could not be found"
-        super().__init__(message)
-
-
 class DataContextError(GreatExpectationsError):
     pass
 
@@ -48,12 +52,22 @@ class ExpectationSuiteError(DataContextError):
     pass
 
 
-class ExpectationSuiteNotAddedToStoreError(DataContextError):
+class ValidationDefinitionError(DataContextError):
+    pass
+
+
+class NoDataDocsError(DataContextError):
     def __init__(self) -> None:
         super().__init__(
-            "ExpectationSuite must be added to the DataContext store before it can be saved. "
-            "Please call my_data_context.suites.add(my_expectation_suite), "
-            "then try your action again."
+            "No Data Docs found. Please check that you have run a checkpoint, "
+            "and that the checkpoint has a UpdateDataDocsAction in its actions."
+        )
+
+
+class ValidationDefinitionNotFoundError(ValidationDefinitionError):
+    def __init__(self, name: str) -> None:
+        super().__init__(
+            f"ValidationDefinition '{name}' not found. Please check the name and try again."
         )
 
 
@@ -62,7 +76,16 @@ class CheckpointError(DataContextError):
 
 
 class CheckpointNotFoundError(CheckpointError):
-    pass
+    def __init__(self, name: str) -> None:
+        super().__init__(f"Checkpoint '{name}' not found. Please check the name and try again.")
+
+
+class CheckpointRunWithoutValidationDefinitionError(CheckpointError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Checkpoint.run() requires at least one validation definition. "
+            "Please add one and try your action again."
+        )
 
 
 class StoreBackendError(DataContextError):
@@ -84,19 +107,11 @@ class StoreBackendTransientError(StoreBackendError):
     pass
 
 
-class ParserError(GreatExpectationsError):
-    pass
-
-
 class InvalidConfigurationYamlError(DataContextError):
     pass
 
 
 class InvalidTopLevelConfigKeyError(GreatExpectationsError):
-    pass
-
-
-class MissingTopLevelConfigKeyError(GreatExpectationsValidationError):
     pass
 
 
@@ -124,20 +139,22 @@ class InvalidDataContextConfigError(InvalidBaseYamlConfigError):
     pass
 
 
-class InvalidCheckpointConfigError(InvalidBaseYamlConfigError):
-    pass
-
-
-class InvalidBatchKwargsError(GreatExpectationsError):
-    pass
-
-
 class InvalidBatchSpecError(GreatExpectationsError):
     pass
 
 
 class InvalidBatchRequestError(GreatExpectationsError):
     pass
+
+
+class BuildBatchRequestError(GreatExpectationsError):
+    def __init__(self, message: str):
+        super().__init__(f"Bad input to build_batch_request: {message}")
+
+
+class NoAvailableBatchesError(GreatExpectationsError):
+    def __init__(self) -> None:
+        super().__init__("No available batches found.")
 
 
 class InvalidBatchIdError(GreatExpectationsError):
@@ -169,42 +186,6 @@ class SuiteParameterError(GreatExpectationsError):
     pass
 
 
-class ProfilerError(GreatExpectationsError):
-    pass
-
-
-class ProfilerConfigurationError(ProfilerError):
-    """A configuration error for a "RuleBasedProfiler" class."""
-
-    pass
-
-
-class ProfilerExecutionError(ProfilerError):
-    """A runtime error for a "RuleBasedProfiler" class."""
-
-    pass
-
-
-class ProfilerNotFoundError(ProfilerError):
-    pass
-
-
-class DataAssistantError(ProfilerError):
-    pass
-
-
-class DataAssistantExecutionError(DataAssistantError):
-    """A runtime error for a "DataAssistant" class."""
-
-    pass
-
-
-class DataAssistantResultExecutionError(DataAssistantError):
-    """A runtime error for a "DataAssistantResult" class."""
-
-    pass
-
-
 class InvalidConfigError(DataContextError):
     def __init__(self, message) -> None:
         self.message = message
@@ -217,13 +198,6 @@ class MissingConfigVariableError(InvalidConfigError):
             missing_config_variable = []
         self.message = message
         self.missing_config_variable = missing_config_variable
-        super().__init__(self.message)
-
-
-class AmbiguousDataAssetNameError(DataContextError):
-    def __init__(self, message, candidates=None) -> None:
-        self.message = message
-        self.candidates = candidates
         super().__init__(self.message)
 
 
@@ -240,10 +214,6 @@ class InvalidExpectationConfigurationError(GreatExpectationsError):
 
 
 class ExpectationNotFoundError(GreatExpectationsError):
-    pass
-
-
-class InvalidValidationResultError(GreatExpectationsError):
     pass
 
 
@@ -267,7 +237,7 @@ Invalid result values were found when trying to instantiate an ExpectationValida
 - Great Expectations enables caching by default.
 - Please ensure that caching behavior is consistent between the underlying Dataset (e.g. Spark) and Great Expectations.
 Result: {}
-"""  # noqa: E501
+"""  # noqa: E501 # FIXME CoP
         self.message = template.format(json.dumps(result_dict, indent=2))
         super().__init__(self.message)
 
@@ -279,7 +249,7 @@ class ConfigNotFoundError(DataContextError):
         self.message = """Error: No gx directory was found here!
     - Please check that you are in the correct directory or have specified the correct directory.
     - If you have never run Great Expectations in this project, please run `great_expectations init` to get started.
-"""  # noqa: E501
+"""  # noqa: E501 # FIXME CoP
         super().__init__(self.message)
 
 
@@ -308,7 +278,6 @@ class PluginClassNotFoundError(DataContextError, AttributeError):
             "FixedLengthTupleFilesystemStoreBackend": "TupleFilesystemStoreBackend",
             "FixedLengthTupleS3StoreBackend": "TupleS3StoreBackend",
             "FixedLengthTupleGCSStoreBackend": "TupleGCSStoreBackend",
-            "InMemorySuiteParameterStore": "SuiteParameterStore",
             "SubdirReaderGenerator": "SubdirReaderBatchKwargsGenerator",
             "ExtractAndStoreSuiteParamsAction": "StoreSuiteParametersAction",
             "StoreAction": "StoreValidationResultAction",
@@ -358,33 +327,33 @@ class ClassInstantiationError(GreatExpectationsError):
             self.message = f"""No module named "{package_name + module_name}" could be found in the repository.  \
 Please make sure that the file, corresponding to this package and module, exists and that dynamic loading of code \
 modules, templates, and assets is supported in your execution environment.  This error is unrecoverable.
-            """  # noqa: E501
+            """  # noqa: E501 # FIXME CoP
         else:
             self.message = f"""The module "{module_name}" exists; however, the system is unable to create an instance \
 of the class "{class_name}", searched for inside this module.  Please make sure that the class named "{class_name}" is \
 properly defined inside its intended module and declared correctly by the calling entity.  This error is unrecoverable.
-            """  # noqa: E501
+            """  # noqa: E501 # FIXME CoP
         super().__init__(self.message)
 
 
 class ExpectationSuiteNotFoundError(GreatExpectationsError):
-    def __init__(self, data_asset_name) -> None:
-        self.data_asset_name = data_asset_name
-        self.message = f"No expectation suite found for data_asset_name {data_asset_name}"
-        super().__init__(self.message)
-
-
-class BatchKwargsError(DataContextError):
-    def __init__(self, message, batch_kwargs=None) -> None:
-        self.message = message
-        self.batch_kwargs = batch_kwargs
-        super().__init__(self.message)
+    def __init__(self, name: str) -> None:
+        super().__init__(
+            f"ExpectationSuite '{name}' not found. Please check the name and try again."
+        )
 
 
 class BatchDefinitionError(DataContextError):
     def __init__(self, message) -> None:
         self.message = message
         super().__init__(self.message)
+
+
+class BatchDefinitionNotFoundError(BatchDefinitionError):
+    def __init__(self, name: str) -> None:
+        super().__init__(
+            f"BatchDefinition '{name}' not found. Please check the name and try again."
+        )
 
 
 class BatchSpecError(DataContextError):
@@ -411,13 +380,13 @@ class DatasourceNotFoundError(DataContextError):
     pass
 
 
-class InvalidConfigValueTypeError(DataContextError):
+class DataAssetNotFoundError(DataContextError):
     pass
 
 
-class DataConnectorError(DataContextError):
-    def __init__(self, message) -> None:
-        self.message = message
+class DataAssetInitializationError(GreatExpectationsError):
+    def __init__(self, message: str) -> None:
+        self.message = f"Cannot initialize data asset: {message}"
         super().__init__(self.message)
 
 
@@ -486,12 +455,33 @@ class GXCloudError(GreatExpectationsError):
 class GXCloudConfigurationError(GreatExpectationsError):
     """
     Error finding and verifying the required configuration values when preparing to connect to GX Cloud
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
 
+# Only used in tests
 class DatabaseConnectionError(GreatExpectationsError):
     """Error connecting to a database including during an integration test."""
 
 
-class MigrationError(GreatExpectationsError):
-    """Error when using the migration tool."""
+class SqlAddBatchDefinitionError(Exception):
+    def __init__(self, msg: str):
+        super().__init__(f"Failed adding batch definition: {msg}")
+
+
+class ValidationActionRegistryError(GreatExpectationsError):
+    pass
+
+
+class ValidationActionAlreadyRegisteredError(ValidationActionRegistryError):
+    def __init__(self, action_type: str) -> None:
+        super().__init__(message=f"Action of type {action_type} is already registered.")
+
+
+class ValidationActionRegistryRetrievalError(ValidationActionRegistryError):
+    def __init__(self, action_type: str | None) -> None:
+        if action_type:
+            message = f"Invalid action configuration; no action of type {action_type} found."
+        else:
+            message = "Invalid action configuration; no 'type' key found."
+
+        super().__init__(message)

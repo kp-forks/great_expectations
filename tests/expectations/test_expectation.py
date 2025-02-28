@@ -1,32 +1,35 @@
 from __future__ import annotations
 
 import itertools
-from typing import TYPE_CHECKING, Any, Dict, List
+import logging
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 import pytest
 
 import great_expectations.expectations as gxe
 from great_expectations.compatibility import pydantic
-from great_expectations.data_context.util import file_relative_path
+from great_expectations.compatibility.typing_extensions import override
+from great_expectations.core.expectation_validation_result import ExpectationValidationResult
 from great_expectations.exceptions import InvalidExpectationConfigurationError
+from great_expectations.execution_engine.execution_engine import ExecutionEngine
 from great_expectations.expectations.expectation import (
     ColumnMapExpectation,
     ColumnPairMapExpectation,
+    Expectation,
     MulticolumnMapExpectation,
-    UnexpectedRowsExpectation,
     _validate_dependencies_against_available_metrics,
 )
 from great_expectations.expectations.expectation_configuration import (
     ExpectationConfiguration,
 )
+from great_expectations.expectations.model_field_types import (
+    MostlyField,  # type needed in pydantic validation
+    ValueSetField,  # type needed in pydantic validation
+)
+from great_expectations.expectations.window import Offset, Window
 from great_expectations.validator.metric_configuration import MetricConfiguration
 
-if TYPE_CHECKING:
-    from great_expectations.data_context.data_context.abstract_data_context import (
-        AbstractDataContext,
-    )
-    from great_expectations.datasource.fluent.interfaces import Batch
-    from great_expectations.datasource.fluent.sqlite_datasource import SqliteDatasource
+LOGGER = logging.getLogger(__name__)
 
 
 class FakeMulticolumnExpectation(MulticolumnMapExpectation):
@@ -88,7 +91,9 @@ def fake_expectation_config(
     [
         (
             FakeMulticolumnExpectation,
-            fake_expectation_config("fake_multicolumn_expectation", {"column_list": ["column_2"]}),
+            fake_expectation_config(
+                "fake_multicolumn_expectation", {"column_list": ["column_1", "column_2"]}
+            ),
         ),
         (
             FakeColumnMapExpectation,
@@ -122,7 +127,8 @@ def test_multicolumn_expectation_has_default_mostly(fake_expectation_cls, config
                 (
                     FakeMulticolumnExpectation,
                     fake_expectation_config(
-                        "fake_multicolumn_expectation", {"column_list": ["column_2"], "mostly": x}
+                        "fake_multicolumn_expectation",
+                        {"column_list": ["column_1", "column_2"], "mostly": x},
                     ),
                 )
                 for x in [0, 0.5, 1]
@@ -163,7 +169,8 @@ def test_expectation_succeeds_with_valid_mostly(fake_expectation_cls, config):
         (
             FakeMulticolumnExpectation,
             fake_expectation_config(
-                "fake_multicolumn_expectation", {"column_list": [], "mostly": -0.5}
+                "fake_multicolumn_expectation",
+                {"column_list": ["column_1", "column_2"], "mostly": -0.5},
             ),
         ),
         (
@@ -232,6 +239,61 @@ def test_expectation_configuration_property():
 
 
 @pytest.mark.unit
+def test_expectation_configuration_window():
+    expectation = gxe.ExpectColumnMaxToBeBetween(
+        column="foo",
+        min_value=0,
+        max_value=10,
+        windows=[
+            Window(
+                constraint_fn="a",
+                parameter_name="b",
+                range=5,
+                offset=Offset(positive=0.2, negative=0.2),
+                strict=True,
+            )
+        ],
+    )
+
+    assert expectation.configuration == ExpectationConfiguration(
+        type="expect_column_max_to_be_between",
+        kwargs={
+            "column": "foo",
+            "min_value": 0,
+            "max_value": 10,
+            "windows": [
+                {
+                    "constraint_fn": "a",
+                    "parameter_name": "b",
+                    "range": 5,
+                    "offset": {"positive": 0.2, "negative": 0.2},
+                    "strict": True,
+                }
+            ],
+        },
+    )
+
+
+@pytest.mark.unit
+def test_expectation_configuration_window_empty():
+    expectation = gxe.ExpectColumnMaxToBeBetween(
+        column="foo",
+        min_value=0,
+        max_value=10,
+        windows=None,
+    )
+
+    assert expectation.configuration == ExpectationConfiguration(
+        type="expect_column_max_to_be_between",
+        kwargs={
+            "column": "foo",
+            "min_value": 0,
+            "max_value": 10,
+        },
+    )
+
+
+@pytest.mark.unit
 def test_expectation_configuration_property_recognizes_state_changes():
     expectation = gxe.ExpectColumnMaxToBeBetween(column="foo", min_value=0, max_value=10)
 
@@ -260,119 +322,16 @@ def test_unrecognized_expectation_arg_raises_error():
         )
 
 
-@pytest.mark.unit
-@pytest.mark.parametrize(
-    "query",
-    [
-        pytest.param("SELECT * FROM table", id="no batch"),
-        pytest.param("SELECT * FROM {{ batch }}", id="invalid format"),
-        pytest.param("SELECT * FROM {active_batch}", id="legacy syntax"),
-    ],
-)
-def test_unexpected_rows_expectation_invalid_query_raises_error(query: str):
-    with pytest.raises(pydantic.ValidationError):
-        UnexpectedRowsExpectation(unexpected_rows_query=query)
-
-
-@pytest.fixture
-def taxi_db_path() -> str:
-    return file_relative_path(__file__, "../test_sets/quickstart/yellow_tripdata.db")
-
-
-@pytest.fixture
-def sqlite_datasource(
-    in_memory_runtime_context: AbstractDataContext, taxi_db_path: str
-) -> SqliteDatasource:
-    context = in_memory_runtime_context
-    datasource_name = "my_sqlite_datasource"
-    return context.data_sources.add_sqlite(
-        datasource_name, connection_string=f"sqlite:///{taxi_db_path}"
-    )
-
-
-@pytest.fixture
-def sqlite_batch(sqlite_datasource: SqliteDatasource) -> Batch:
-    datasource = sqlite_datasource
-    asset = datasource.add_table_asset("yellow_tripdata_sample_2022_01")
-
-    batch_request = asset.build_batch_request()
-    return asset.get_batch_list_from_batch_request(batch_request)[0]
-
-
-@pytest.mark.sqlite
-@pytest.mark.parametrize(
-    "query, expected_success, expected_observed_value, expected_unexpected_rows",
-    [
-        pytest.param(
-            "SELECT * FROM {batch} WHERE passenger_count > 7",
-            True,
-            0,
-            [],
-            id="success",
-        ),
-        pytest.param(
-            # There is a single instance where passenger_count == 7
-            "SELECT * FROM {batch} WHERE passenger_count > 6",
-            False,
-            1,
-            [
-                {
-                    "?": 48422,
-                    "DOLocationID": 132,
-                    "PULocationID": 132,
-                    "RatecodeID": 5.0,
-                    "VendorID": 2,
-                    "airport_fee": 0.0,
-                    "congestion_surcharge": 0.0,
-                    "extra": 0.0,
-                    "fare_amount": 70.0,
-                    "improvement_surcharge": 0.3,
-                    "mta_tax": 0.0,
-                    "passenger_count": 7.0,
-                    "payment_type": 1,
-                    "store_and_fwd_flag": "N",
-                    "tip_amount": 21.09,
-                    "tolls_amount": 0.0,
-                    "total_amount": 91.39,
-                    "tpep_dropoff_datetime": "2022-01-01 19:20:46",
-                    "tpep_pickup_datetime": "2022-01-01 19:20:43",
-                    "trip_distance": 0.0,
-                }
-            ],
-            id="failure",
-        ),
-    ],
-)
-def test_unexpected_rows_expectation_validate(
-    sqlite_batch: Batch,
-    query: str,
-    expected_success: bool,
-    expected_observed_value: int,
-    expected_unexpected_rows: list[dict],
-):
-    batch = sqlite_batch
-
-    expectation = UnexpectedRowsExpectation(unexpected_rows_query=query)
-    result = batch.validate(expectation)
-
-    assert result.success is expected_success
-
-    res = result.result
-    assert res["observed_value"] == expected_observed_value
-
-    unexpected_rows = res["details"]["unexpected_rows"]
-    assert unexpected_rows == expected_unexpected_rows
-
-
 class TestSuiteParameterOptions:
     """Tests around the suite_parameter_options property of Expectations.
 
     Note: evaluation_parameter_options is currently a sorted tuple, but doesn't necessarily have to be
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     SUITE_PARAMETER_MIN = "my_min"
     SUITE_PARAMETER_MAX = "my_max"
     SUITE_PARAMETER_VALUE = "my_value"
+    SUITE_PARAMETER_MOSTLY = "my_mostly"
 
     @pytest.mark.unit
     def test_expectation_without_evaluation_parameter(self):
@@ -387,6 +346,13 @@ class TestSuiteParameterOptions:
             max_value={"$PARAMETER": self.SUITE_PARAMETER_MAX},
         )
         assert expectation.suite_parameter_options == (self.SUITE_PARAMETER_MAX,)
+
+    @pytest.mark.unit
+    def test_column_map_expectation_with_evaluation_parameter(self):
+        expectation = gxe.ExpectColumnValuesToBeNull(
+            column="foo", mostly={"$PARAMETER": self.SUITE_PARAMETER_MOSTLY}
+        )
+        assert expectation.suite_parameter_options == (self.SUITE_PARAMETER_MOSTLY,)
 
     @pytest.mark.unit
     def test_expectation_with_multiple_suite_parameters(self):
@@ -408,3 +374,211 @@ class TestSuiteParameterOptions:
             max_value={"$PARAMETER": self.SUITE_PARAMETER_VALUE},
         )
         assert expectation.suite_parameter_options == (self.SUITE_PARAMETER_VALUE,)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "column_a,column_b,expected",
+    [
+        pytest.param("foo", "foo", True, id="equivalent_columns"),
+        pytest.param("foo", "bar", False, id="different_columns"),
+    ],
+)
+def test_expectation_equality(column_a: str, column_b: str, expected: bool):
+    expectation_a = gxe.ExpectColumnValuesToBeBetween(column=column_a, min_value=0, max_value=10)
+    expectation_b = gxe.ExpectColumnValuesToBeBetween(column=column_b, min_value=0, max_value=10)
+
+    assert (expectation_a == expectation_b) is expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "notes_a,notes_b,expected",
+    [
+        pytest.param(None, None, True, id="both_none"),
+        pytest.param([], None, True, id="both_falsy"),
+        pytest.param("my_notes", None, False, id="missing_notes"),
+        pytest.param("my_notes", "my_other_notes", False, id="different_notes"),
+        pytest.param("my_notes", "my_notes", True, id="equivalent_notes"),
+    ],
+)
+def test_expectation_equality_with_notes(
+    notes_a: str | list[str] | None, notes_b: str | list[str] | None, expected: bool
+):
+    expectation_a = gxe.ExpectColumnValuesToBeBetween(
+        column="foo", min_value=0, max_value=10, notes=notes_a
+    )
+    expectation_b = gxe.ExpectColumnValuesToBeBetween(
+        column="foo", min_value=0, max_value=10, notes=notes_b
+    )
+
+    assert (expectation_a == expectation_b) is expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "meta_a,meta_b,expected",
+    [
+        pytest.param(None, None, True, id="both_none"),
+        pytest.param({}, None, True, id="both_falsy"),
+        pytest.param({"author": "Bob Dylan"}, None, False, id="missing_meta"),
+        pytest.param(
+            {"author": "Bob Dylan"}, {"author": "John Lennon"}, False, id="different_meta"
+        ),
+        pytest.param({"author": "Bob Dylan"}, {"author": "Bob Dylan"}, True, id="equivalent_meta"),
+    ],
+)
+def test_expectation_equality_with_meta(meta_a: dict | None, meta_b: dict | None, expected: bool):
+    expectation_a = gxe.ExpectColumnValuesToBeBetween(
+        column="foo", min_value=0, max_value=10, meta=meta_a
+    )
+    expectation_b = gxe.ExpectColumnValuesToBeBetween(
+        column="foo", min_value=0, max_value=10, meta=meta_b
+    )
+
+    assert (expectation_a == expectation_b) is expected
+
+
+@pytest.mark.unit
+def test_expectation_equality_ignores_rendered_content():
+    column = "whatever"
+    min_value = 0
+    max_value = 10
+    expectation_a = gxe.ExpectColumnValuesToBeBetween(
+        column=column,
+        min_value=min_value,
+        max_value=max_value,
+    )
+    expectation_a.render()
+    assert expectation_a.rendered_content
+
+    expectation_b = gxe.ExpectColumnValuesToBeBetween(
+        column=column,
+        min_value=min_value,
+        max_value=max_value,
+    )
+    expectation_b.rendered_content = None
+
+    assert expectation_a == expectation_b
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "expectation_a, expectation_b, expected_result",
+    [
+        pytest.param(
+            gxe.ExpectColumnValuesToBeBetween(column="foo"), {}, False, id="different_objects"
+        ),
+        pytest.param(
+            gxe.ExpectColumnDistinctValuesToBeInSet(column="bar", value_set=[1, 2, 3]),
+            gxe.ExpectColumnValuesToBeBetween(column="foo"),
+            True,
+            id="different_expectation_types",
+        ),
+        pytest.param(
+            gxe.ExpectColumnValuesToBeBetween(column="foo"),
+            gxe.ExpectColumnValuesToBeBetween(column="foo"),
+            False,
+            id="equivalent_expectations",
+        ),
+        pytest.param(
+            gxe.ExpectColumnValuesToBeBetween(
+                column="foo", id="bbbe648e-0a43-431b-81a0-04e68f1473ae"
+            ),
+            gxe.ExpectColumnValuesToBeBetween(
+                column="foo", id="aaae648e-0a43-431b-81a0-04e68f1473ae"
+            ),
+            False,
+            id="equiv_expectations_with_ids",
+        ),
+    ],
+)
+def test_expectations___lt__(expectation_a, expectation_b, expected_result):
+    assert (expectation_a < expectation_b) is expected_result
+
+
+@pytest.mark.unit
+def test_expectation_sorting():
+    expectation_a = gxe.ExpectColumnValuesToBeBetween(
+        column="foo", id="80b6d508-a843-426e-97c0-7ff64d35ac04"
+    )
+    expectation_b = gxe.ExpectColumnValuesToBeBetween(
+        column="foo", id="4cd1e63a-880b-46ea-93e8-c11636df18b8"
+    )
+    expectation_c = gxe.ExpectTableColumnCountToBeBetween()
+    expectation_d = gxe.ExpectColumnMaxToBeBetween(column="foo", min_value=0, max_value=10)
+    expectation_e = gxe.ExpectColumnMedianToBeBetween(column="foo", min_value=0, max_value=10)
+
+    expectations = [expectation_a, expectation_b, expectation_c, expectation_d, expectation_e]
+
+    assert sorted(expectations) == [
+        expectation_d,
+        expectation_e,
+        expectation_b,
+        expectation_a,
+        expectation_c,
+    ]
+
+
+class _SampleExpectation(Expectation):
+    mostly: MostlyField
+    value_set: ValueSetField
+
+    @override
+    def _validate(
+        self,
+        metrics: dict,
+        runtime_configuration: Optional[dict] = None,
+        execution_engine: Optional[ExecutionEngine] = None,
+    ) -> Union[ExpectationValidationResult, dict]:
+        # just satisfying the abc
+        return {}
+
+
+class TestCustomAnnotatedFields:
+    @pytest.mark.parametrize(
+        "mostly",
+        [
+            0,
+            0.0,
+            0.5,
+            0.55555,
+            1,
+            1.0,
+        ],
+    )
+    @pytest.mark.unit
+    def test_valid_mostly_values(self, mostly: float):
+        expectation = _SampleExpectation(mostly=mostly, value_set=[1, 2, 3])
+        assert expectation.mostly == mostly
+
+    @pytest.mark.parametrize(
+        "mostly",
+        [
+            None,
+            "one",
+            -1,
+            2,
+        ],
+    )
+    @pytest.mark.unit
+    def test_invalid_mostly_values(self, mostly: Any):
+        with pytest.raises(pydantic.ValidationError):
+            _SampleExpectation(mostly=mostly, value_set=[1, 2, 3])
+
+    @pytest.mark.parametrize(
+        "value_set",
+        [
+            ["a"],
+            [1],
+            {"a"},
+            {1},
+            [1, 2, 3],
+            ["a", "b", "c"],
+            {"$PARAMETER": "my_param"},
+        ],
+    )
+    @pytest.mark.unit
+    def test_valid_value_set_values(self, value_set: Union[Sequence, set]):
+        expectation = _SampleExpectation(mostly=1, value_set=value_set)
+        assert expectation.value_set == value_set

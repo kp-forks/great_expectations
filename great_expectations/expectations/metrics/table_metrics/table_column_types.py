@@ -26,7 +26,7 @@ class ColumnTypes(TableMetricProvider):
     default_kwarg_values = {"include_nested": True}
 
     @metric_value(engine=PandasExecutionEngine)
-    def _pandas(  # noqa: PLR0913
+    def _pandas(
         cls,
         execution_engine: PandasExecutionEngine,
         metric_domain_kwargs: dict,
@@ -40,7 +40,7 @@ class ColumnTypes(TableMetricProvider):
         return [{"name": name, "type": dtype} for (name, dtype) in zip(df.columns, df.dtypes)]
 
     @metric_value(engine=SqlAlchemyExecutionEngine)
-    def _sqlalchemy(  # noqa: PLR0913
+    def _sqlalchemy(
         cls,
         execution_engine: SqlAlchemyExecutionEngine,
         metric_domain_kwargs: dict,
@@ -53,8 +53,8 @@ class ColumnTypes(TableMetricProvider):
             if execution_engine.batch_manager.active_batch_data_id is not None:
                 batch_id = execution_engine.batch_manager.active_batch_data_id
             else:
-                raise GreatExpectationsError(  # noqa: TRY003
-                    "batch_id could not be determined from domain kwargs and no active_batch_data is loaded into the "  # noqa: E501
+                raise GreatExpectationsError(  # noqa: TRY003 # FIXME CoP
+                    "batch_id could not be determined from domain kwargs and no active_batch_data is loaded into the "  # noqa: E501 # FIXME CoP
                     "execution engine"
                 )
 
@@ -63,14 +63,14 @@ class ColumnTypes(TableMetricProvider):
             execution_engine.batch_manager.batch_data_cache.get(batch_id),
         )
         if batch_data is None:
-            raise GreatExpectationsError(  # noqa: TRY003
-                "the requested batch is not available; please load the batch into the execution engine."  # noqa: E501
+            raise GreatExpectationsError(  # noqa: TRY003 # FIXME CoP
+                "the requested batch is not available; please load the batch into the execution engine."  # noqa: E501 # FIXME CoP
             )
 
         return _get_sqlalchemy_column_metadata(execution_engine, batch_data)
 
     @metric_value(engine=SparkDFExecutionEngine)
-    def _spark(  # noqa: PLR0913
+    def _spark(
         cls,
         execution_engine: SparkDFExecutionEngine,
         metric_domain_kwargs: dict,
@@ -92,12 +92,12 @@ def _get_sqlalchemy_column_metadata(
 ):
     table_selectable: str | sqlalchemy.TextClause
 
-    if sqlalchemy.Table and isinstance(batch_data.selectable, sqlalchemy.Table):
+    if sqlalchemy.Table and isinstance(batch_data.selectable, sqlalchemy.Table):  # type: ignore[truthy-function] # FIXME CoP
         table_selectable = batch_data.source_table_name or batch_data.selectable.name
         schema_name = batch_data.source_schema_name or batch_data.selectable.schema
 
     # if custom query was passed in
-    elif sqlalchemy.TextClause and isinstance(batch_data.selectable, sqlalchemy.TextClause):
+    elif sqlalchemy.TextClause and isinstance(batch_data.selectable, sqlalchemy.TextClause):  # type: ignore[truthy-function] # FIXME CoP
         table_selectable = batch_data.selectable
         schema_name = None
     else:
@@ -106,12 +106,12 @@ def _get_sqlalchemy_column_metadata(
 
     return get_sqlalchemy_column_metadata(
         execution_engine=execution_engine,
-        table_selectable=table_selectable,
+        table_selectable=table_selectable,  # type: ignore[arg-type] # FIXME CoP
         schema_name=schema_name,
     )
 
 
-def _get_spark_column_metadata(field, parent_name="", include_nested=True):  # noqa: C901 - too complex
+def _get_spark_column_metadata(field, parent_name="", include_nested=True):  # noqa: C901 #  too complex
     cols = []
     if parent_name != "":
         parent_name = f"{parent_name}."
@@ -146,6 +146,6 @@ def _get_spark_column_metadata(field, parent_name="", include_nested=True):  # n
                     include_nested=include_nested,
                 )
     else:
-        raise ValueError("unrecognized field type")  # noqa: TRY003
+        raise ValueError("unrecognized field type")  # noqa: TRY003 # FIXME CoP
 
     return cols

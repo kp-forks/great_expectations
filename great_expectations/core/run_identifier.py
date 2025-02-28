@@ -10,7 +10,8 @@ from dateutil.parser import parse
 from marshmallow import Schema, fields, post_load, pre_dump
 
 from great_expectations._docs_decorators import public_api
-from great_expectations.alias_types import JSONValues  # noqa: TCH001
+from great_expectations.alias_types import JSONValues  # noqa: TCH001 # FIXME CoP
+from great_expectations.compatibility.typing_extensions import override
 from great_expectations.core.data_context_key import DataContextKey
 
 
@@ -47,7 +48,7 @@ class RunIdentifier(DataContextKey):
 
         if not run_time:
             try:
-                run_time = parse(run_name)  # type: ignore[arg-type]
+                run_time = parse(run_name)  # type: ignore[arg-type] # FIXME CoP
             except (ValueError, TypeError):
                 run_time = None
 
@@ -67,21 +68,22 @@ class RunIdentifier(DataContextKey):
     def run_time(self):
         return self._run_time
 
-    def to_tuple(self):
+    def to_tuple(self):  # type: ignore[explicit-override] # FIXME
         return (
             self._run_name or "__none__",
             self._run_time.astimezone(tz=datetime.timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ"),
         )
 
-    def to_fixed_length_tuple(self):
+    def to_fixed_length_tuple(self):  # type: ignore[explicit-override] # FIXME
         return (
             self._run_name or "__none__",
             self._run_time.astimezone(tz=datetime.timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ"),
         )
 
-    def __repr__(self):
+    def __repr__(self):  # type: ignore[explicit-override] # FIXME
         return json.dumps(self.to_json_dict())
 
+    @override
     def __str__(self):
         return json.dumps(self.to_json_dict(), indent=2)
 

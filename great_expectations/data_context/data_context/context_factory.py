@@ -8,6 +8,7 @@ from typing import (
     Callable,
     Literal,
     Mapping,
+    Optional,
     Type,
     overload,
 )
@@ -27,6 +28,9 @@ if TYPE_CHECKING:
     from typing_extensions import TypeAlias
 
     from great_expectations.alias_types import PathStr
+    from great_expectations.core.config_provider import _ConfigurationProvider
+    from great_expectations.core.factory import ValidationDefinitionFactory
+    from great_expectations.core.factory.suite_factory import SuiteFactory
     from great_expectations.data_context import (
         AbstractDataContext,
         CloudDataContext,
@@ -35,7 +39,6 @@ if TYPE_CHECKING:
     )
     from great_expectations.data_context.store import (
         ExpectationsStore,
-        SuiteParameterStore,
         ValidationResultsStore,
     )
     from great_expectations.data_context.store.checkpoint_store import CheckpointStore
@@ -58,7 +61,7 @@ class ProjectManager:
     def __init__(self):
         self.__project = None
 
-    def get_project(  # noqa: PLR0913
+    def get_project(  # noqa: PLR0913 # FIXME CoP
         self,
         project_config: DataContextConfig | Mapping | None = None,
         context_root_dir: PathStr | None = None,
@@ -68,6 +71,7 @@ class ProjectManager:
         cloud_access_token: str | None = None,
         cloud_organization_id: str | None = None,
         cloud_mode: bool | None = None,
+        user_agent_str: str | None = None,
         mode: ContextModes | None = None,
     ) -> AbstractDataContext:
         self.__project = self._build_context(
@@ -79,6 +83,7 @@ class ProjectManager:
             cloud_access_token=cloud_access_token,
             cloud_organization_id=cloud_organization_id,
             cloud_mode=cloud_mode,
+            user_agent_str=user_agent_str,
             mode=mode,
         )
         return self.__project
@@ -104,14 +109,17 @@ class ProjectManager:
     def get_validation_definition_store(self) -> ValidationDefinitionStore:
         return self._project.validation_definition_store
 
-    def get_suite_parameters_store(self) -> SuiteParameterStore:
-        return self._project.suite_parameter_store
+    def get_validation_definitions_factory(self) -> ValidationDefinitionFactory:
+        return self._project.validation_definitions
 
     def get_datasources(self) -> DatasourceDict:
-        return self._project.datasources
+        return self._project.data_sources.all()
 
     def get_validator(self, batch_request: BatchRequest) -> Validator:
         return self._project.get_validator(batch_request=batch_request)
+
+    def get_suite_factory(self) -> SuiteFactory:
+        return self._project.suites
 
     def is_using_cloud(self) -> bool:
         from great_expectations.data_context import CloudDataContext
@@ -138,7 +146,7 @@ class ProjectManager:
         site_name: str | None = None,
         only_if_exists: bool = True,
         site_names: list[str] | None = None,
-    ) -> list[dict[str, str]]:
+    ) -> list[dict[str, Optional[str]]]:
         return self._project.get_docs_sites_urls(
             resource_identifier=resource_identifier,
             site_name=site_name,
@@ -146,7 +154,10 @@ class ProjectManager:
             site_names=site_names,
         )
 
-    def _build_context(  # noqa: PLR0913
+    def get_config_provider(self) -> _ConfigurationProvider:
+        return self._project.config_provider
+
+    def _build_context(  # noqa: PLR0913 # FIXME CoP
         self,
         project_config: DataContextConfig | Mapping | None = None,
         context_root_dir: PathStr | None = None,
@@ -156,6 +167,7 @@ class ProjectManager:
         cloud_access_token: str | None = None,
         cloud_organization_id: str | None = None,
         cloud_mode: bool | None = None,
+        user_agent_str: str | None = None,
         mode: ContextModes | None = None,
     ) -> AbstractDataContext:
         project_config = self._prepare_project_config(project_config)
@@ -164,12 +176,14 @@ class ProjectManager:
             "ephemeral": dict(
                 project_config=project_config,
                 runtime_environment=runtime_environment,
+                user_agent_str=user_agent_str,
             ),
             "file": dict(
                 project_config=project_config,
                 context_root_dir=context_root_dir,
                 project_root_dir=project_root_dir or Path.cwd(),
                 runtime_environment=runtime_environment,
+                user_agent_str=user_agent_str,
             ),
             "cloud": dict(
                 project_config=project_config,
@@ -179,6 +193,8 @@ class ProjectManager:
                 cloud_base_url=cloud_base_url,
                 cloud_access_token=cloud_access_token,
                 cloud_organization_id=cloud_organization_id,
+                user_agent_str=user_agent_str,
+                cloud_mode=True,
             ),
             None: dict(
                 project_config=project_config,
@@ -188,13 +204,15 @@ class ProjectManager:
                 cloud_base_url=cloud_base_url,
                 cloud_access_token=cloud_access_token,
                 cloud_organization_id=cloud_organization_id,
+                user_agent_str=user_agent_str,
                 cloud_mode=cloud_mode,
+                mode=mode,
             ),
         }
         try:
             kwargs = param_lookup[mode]
         except KeyError:
-            raise ValueError(f"Unknown mode {mode}. Please choose one of: ephemeral, file, cloud.")  # noqa: TRY003
+            raise ValueError(f"Unknown mode {mode}. Please choose one of: ephemeral, file, cloud.")  # noqa: TRY003 # FIXME CoP
 
         from great_expectations.data_context.data_context import (
             AbstractDataContext,
@@ -213,7 +231,7 @@ class ProjectManager:
             "ephemeral": EphemeralDataContext,
             "file": FileDataContext,
             "cloud": CloudDataContext,
-            None: AbstractDataContext,  # type: ignore[type-abstract]
+            None: AbstractDataContext,  # type: ignore[type-abstract] # FIXME CoP
         }
 
         context_fn_map: dict[ContextModes | None, Callable] = {
@@ -228,15 +246,14 @@ class ProjectManager:
 
         expected_type = expected_ctx_types[mode]
         if not isinstance(context, expected_type):
-            # example I want an ephemeral context but the presence of a GX_CLOUD env var gives me a cloud context  # noqa: E501
-            # this kind of thing should not be possible but there may be some edge cases
-            raise ValueError(  # noqa: TRY003, TRY004
-                f"Provided mode {mode} returned context of type {type(context).__name__} instead of {expected_type.__name__}; please check your input arguments."  # noqa: E501
+            # example I want an ephemeral context but the presence of a GX_CLOUD env var gives me a cloud context  # noqa: E501 # FIXME CoP
+            raise ValueError(  # noqa: TRY003, TRY004 # FIXME CoP
+                f"Provided mode {mode} returned context of type {type(context).__name__} instead of {expected_type.__name__}; please check your input arguments."  # noqa: E501 # FIXME CoP
             )
 
         return context
 
-    def _get_default_context(  # noqa: PLR0913
+    def _get_default_context(  # noqa: PLR0913 # FIXME CoP
         self,
         project_config: DataContextConfig | None = None,
         context_root_dir: PathStr | None = None,
@@ -245,7 +262,9 @@ class ProjectManager:
         cloud_base_url: str | None = None,
         cloud_access_token: str | None = None,
         cloud_organization_id: str | None = None,
+        user_agent_str: str | None = None,
         cloud_mode: bool | None = None,
+        mode: ContextModes | None = None,
     ) -> AbstractDataContext:
         """Infer which type of DataContext a user wants based on available parameters."""
         # First, check for GX Cloud conditions
@@ -258,6 +277,8 @@ class ProjectManager:
             cloud_base_url=cloud_base_url,
             cloud_access_token=cloud_access_token,
             cloud_organization_id=cloud_organization_id,
+            user_agent_str=user_agent_str,
+            mode=mode,
         )
 
         if cloud_context:
@@ -269,6 +290,7 @@ class ProjectManager:
             context_root_dir=context_root_dir,
             project_root_dir=project_root_dir,
             runtime_environment=runtime_environment,
+            user_agent_str=user_agent_str,
         )
         if file_context:
             return file_context
@@ -277,6 +299,7 @@ class ProjectManager:
         return self._get_ephemeral_context(
             project_config=project_config,
             runtime_environment=runtime_environment,
+            user_agent_str=user_agent_str,
         )
 
     def _prepare_project_config(
@@ -295,7 +318,7 @@ class ProjectManager:
 
         return project_config
 
-    def _get_cloud_context(  # noqa: PLR0913
+    def _get_cloud_context(  # noqa: PLR0913 # FIXME CoP
         self,
         project_config: DataContextConfig | Mapping | None = None,
         context_root_dir: PathStr | None = None,
@@ -304,8 +327,13 @@ class ProjectManager:
         cloud_base_url: str | None = None,
         cloud_access_token: str | None = None,
         cloud_organization_id: str | None = None,
+        user_agent_str: str | None = None,
         cloud_mode: bool | None = None,
+        mode: ContextModes | None = None,
     ) -> CloudDataContext | None:
+        if cloud_mode is False:
+            return None  # user has specifically disabled cloud mode, so we don't check for env vars
+
         from great_expectations.data_context.data_context import CloudDataContext
 
         config_available = CloudDataContext.is_cloud_config_available(
@@ -314,8 +342,7 @@ class ProjectManager:
             cloud_organization_id=cloud_organization_id,
         )
 
-        # If config available and not explicitly disabled
-        if config_available and cloud_mode is not False:
+        if config_available:
             return CloudDataContext(
                 project_config=project_config,
                 runtime_environment=runtime_environment,
@@ -324,14 +351,17 @@ class ProjectManager:
                 cloud_base_url=cloud_base_url,
                 cloud_access_token=cloud_access_token,
                 cloud_organization_id=cloud_organization_id,
+                user_agent_str=user_agent_str,
             )
-
-        if cloud_mode and not config_available:
-            raise GXCloudConfigurationError(  # noqa: TRY003
-                "GX Cloud Mode enabled, but missing env vars: GX_CLOUD_ORGANIZATION_ID, GX_CLOUD_ACCESS_TOKEN"  # noqa: E501
+        elif (
+            mode != "cloud" and not cloud_mode
+        ):  # cloud mode not specified, and env vars not available
+            return None
+        else:
+            raise GXCloudConfigurationError(  # noqa: TRY003 # one time exception
+                "Unable to create a CloudDataContext due to one or more missing environment "
+                "variables: GX_CLOUD_ORGANIZATION_ID, GX_CLOUD_ACCESS_TOKEN"
             )
-
-        return None
 
     def _get_file_context(
         self,
@@ -339,6 +369,7 @@ class ProjectManager:
         context_root_dir: PathStr | None = None,
         project_root_dir: PathStr | None = None,
         runtime_environment: dict | None = None,
+        user_agent_str: str | None = None,
     ) -> FileDataContext | None:
         from great_expectations.data_context.data_context import FileDataContext
 
@@ -348,6 +379,7 @@ class ProjectManager:
                 context_root_dir=context_root_dir,
                 project_root_dir=project_root_dir,
                 runtime_environment=runtime_environment,
+                user_agent_str=user_agent_str,
             )
         except gx_exceptions.ConfigNotFoundError:
             logger.info("Could not find local file-backed GX project")
@@ -357,6 +389,7 @@ class ProjectManager:
         self,
         project_config: DataContextConfig | None = None,
         runtime_environment: dict | None = None,
+        user_agent_str: str | None = None,
     ) -> EphemeralDataContext:
         from great_expectations.data_context.data_context import EphemeralDataContext
         from great_expectations.data_context.types.base import (
@@ -372,6 +405,7 @@ class ProjectManager:
         return EphemeralDataContext(
             project_config=project_config,
             runtime_environment=runtime_environment,
+            user_agent_str=user_agent_str,
         )
 
 
@@ -380,7 +414,7 @@ project_manager = ProjectManager()
 
 
 @overload
-def get_context(  # type: ignore[overload-overlap]
+def get_context(
     project_config: DataContextConfig | Mapping | None = ...,
     context_root_dir: None = ...,
     project_root_dir: None = ...,
@@ -389,33 +423,36 @@ def get_context(  # type: ignore[overload-overlap]
     cloud_access_token: None = ...,
     cloud_organization_id: None = ...,
     cloud_mode: Literal[False] | None = ...,
+    user_agent_str: str | None = ...,
     mode: Literal["ephemeral"] = ...,
 ) -> EphemeralDataContext: ...
 
 
 @overload
-def get_context(  # type: ignore[overload-overlap]
+def get_context(
     project_config: DataContextConfig | Mapping | None = ...,
-    context_root_dir: PathStr = ...,  # If context_root_dir is provided, project_root_dir shouldn't be  # noqa: E501
+    context_root_dir: PathStr = ...,  # If context_root_dir is provided, project_root_dir shouldn't be  # noqa: E501 # FIXME CoP
     project_root_dir: None = ...,
     runtime_environment: dict | None = ...,
     cloud_base_url: None = ...,
     cloud_access_token: None = ...,
     cloud_organization_id: None = ...,
     cloud_mode: Literal[False] | None = ...,
+    user_agent_str: str | None = ...,
 ) -> FileDataContext: ...
 
 
 @overload
-def get_context(  # type: ignore[overload-overlap]
+def get_context(
     project_config: DataContextConfig | Mapping | None = ...,
     context_root_dir: None = ...,
-    project_root_dir: PathStr = ...,  # If project_root_dir is provided, context_root_dir shouldn't be  # noqa: E501
+    project_root_dir: PathStr = ...,  # If project_root_dir is provided, context_root_dir shouldn't be  # noqa: E501 # FIXME CoP
     runtime_environment: dict | None = ...,
     cloud_base_url: None = ...,
     cloud_access_token: None = ...,
     cloud_organization_id: None = ...,
     cloud_mode: Literal[False] | None = ...,
+    user_agent_str: str | None = ...,
     mode: Literal["file"] | None = ...,
 ) -> FileDataContext: ...
 
@@ -430,6 +467,7 @@ def get_context(
     cloud_access_token: str | None = ...,
     cloud_organization_id: str | None = ...,
     cloud_mode: Literal[True] = ...,
+    user_agent_str: str | None = ...,
     mode: Literal["cloud"] | None = ...,
 ) -> CloudDataContext: ...
 
@@ -444,12 +482,13 @@ def get_context(
     cloud_access_token: str | None = ...,
     cloud_organization_id: str | None = ...,
     cloud_mode: bool | None = ...,
+    user_agent_str: str | None = ...,
     mode: None = ...,
 ) -> EphemeralDataContext | FileDataContext | CloudDataContext: ...
 
 
 @public_api
-def get_context(  # noqa: PLR0913
+def get_context(  # noqa: PLR0913 # FIXME CoP
     project_config: DataContextConfig | Mapping | None = None,
     context_root_dir: PathStr | None = None,
     project_root_dir: PathStr | None = None,
@@ -458,6 +497,7 @@ def get_context(  # noqa: PLR0913
     cloud_access_token: str | None = None,
     cloud_organization_id: str | None = None,
     cloud_mode: bool | None = None,
+    user_agent_str: str | None = None,
     mode: ContextModes | None = None,
 ) -> AbstractDataContext:
     """Method to return the appropriate Data Context depending on parameters and environment.
@@ -520,6 +560,7 @@ def get_context(  # noqa: PLR0913
         cloud_organization_id: org_id for GX Cloud account.
         cloud_mode: whether to run GX in Cloud mode (default is None).
             If None, cloud mode is assumed if cloud credentials are set up. Set to False to override.
+        user_agent_str: Optional string, should be of format <PRODUCT> / <VERSION> <COMMENT>
         mode: which mode to use. One of: ephemeral, file, cloud.
             Note: if mode is specified, cloud_mode is ignored.
 
@@ -530,7 +571,7 @@ def get_context(  # noqa: PLR0913
 
     Raises:
         GXCloudConfigurationError: Cloud mode enabled, but missing configuration.
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
     return project_manager.get_project(
         project_config=project_config,
         context_root_dir=context_root_dir,
@@ -540,6 +581,7 @@ def get_context(  # noqa: PLR0913
         cloud_access_token=cloud_access_token,
         cloud_organization_id=cloud_organization_id,
         cloud_mode=cloud_mode,
+        user_agent_str=user_agent_str,
         mode=mode,
     )
 

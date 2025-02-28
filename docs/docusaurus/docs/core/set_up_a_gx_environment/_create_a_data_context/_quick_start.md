@@ -4,16 +4,23 @@ import TabItem from '@theme/TabItem'
 import PrereqPythonInstallation from '../../_core_components/prerequisites/_python_installation.md'
 import PrereqGxInstallation from '../../_core_components/prerequisites/_gx_installation.md'
 
-## Prerequisites
+## Prerequisites {#prerequisites-quick-start}
 
 - <PrereqPythonInstallation/>
 - <PrereqGxInstallation/> 
 
 ## Request an available Data Context
 
-<Tabs>
+<Tabs 
+   queryString="procedure"
+   defaultValue="instructions"
+   values={[
+      {value: 'instructions', label: 'Instructions'},
+      {value: 'sample_code', label: 'Sample code'}
+   ]}
+>
 
-<TabItem value="procedure" label="Procedure">
+<TabItem value="instructions" label="Instructions">
 
 1. Run the following code to request a Data Context:
 

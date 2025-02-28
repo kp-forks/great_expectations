@@ -4,7 +4,7 @@ import great_expectations as gx
 # These imports need to be cleaned up
 from great_expectations.core.expectation_suite import ExpectationSuite
 from great_expectations.core.validation_definition import ValidationDefinition
-from great_expectations.expectations.expectation import UnexpectedRowsExpectation
+from great_expectations.expectations import UnexpectedRowsExpectation
 
 # </snippet>
 
@@ -28,7 +28,7 @@ load_data_into_test_database(
 
 # <snippet name="docs/docusaurus/docs/snippets/unexpected_row_expectation.py define_custom_expectation">
 class UnexpectedTripDistance(UnexpectedRowsExpectation):
-    unexpected_rows_query = """
+    unexpected_rows_query: str = """
         SELECT
             vendor_id, pickup_datetime
         FROM
@@ -53,7 +53,7 @@ batch_definition = (
 
 # <snippet name="docs/docusaurus/docs/snippets/unexpected_row_expectation.py define_expectation_suite">
 expectation = UnexpectedTripDistance()
-suite = ExpectationSuite("my_suite", expectations=[expectation])
+suite = context.suites.add(ExpectationSuite("my_suite", expectations=[expectation]))
 # </snippet>
 
 # <snippet name="docs/docusaurus/docs/snippets/unexpected_row_expectation.py validate_suite">
@@ -65,4 +65,3 @@ result = validation_definition.run()
 
 assert not result.success
 assert len(result.results) == 1
-assert result.results[0].result["observed_value"] == 1

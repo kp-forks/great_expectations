@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Dict, Tuple
 
 import pytest
 
@@ -19,13 +18,12 @@ from great_expectations.datasource.fluent.interfaces import (
 from great_expectations.exceptions.exceptions import DataContextError
 from great_expectations.execution_engine import ExecutionEngine
 from great_expectations.validator.computed_metric import MetricValue
-from great_expectations.validator.metric_configuration import MetricConfiguration
+from great_expectations.validator.metric_configuration import (
+    MetricConfiguration,
+    MetricConfigurationID,
+)
 from great_expectations.validator.metrics_calculator import MetricsCalculator
 from tests.expectations.test_util import get_table_columns_metric
-
-if TYPE_CHECKING:
-    from great_expectations.datasource.fluent.interfaces import Batch
-
 
 logger = logging.getLogger(__name__)
 
@@ -53,11 +51,12 @@ def run_checkpoint_and_data_doc(
     validator.expect_column_median_to_be_between(column="passenger_count", min_value=1, max_value=4)
 
     suite = validator.expectation_suite
+    suite.save()
     batch_def = asset.add_batch_definition(name="my_batch_definition")
 
     # Configure and run a checkpoint
-    validation_definition = ValidationDefinition(
-        name="my_validation_definition", suite=suite, data=batch_def
+    validation_definition = context.validation_definitions.add(
+        ValidationDefinition(name="my_validation_definition", suite=suite, data=batch_def)
     )
     metadata = validator.active_batch.metadata  # type: ignore[union-attr] # active_batch could be None
     if isinstance(datasource, PandasDatasource):
@@ -84,15 +83,15 @@ def run_checkpoint_and_data_doc(
     expected_metric_values = {
         "expect_table_row_count_to_be_between": {
             "value": 10000,
-            "rendered_template": "Must have greater than or equal to $min_value and less than or equal to $max_value rows.",  # noqa: E501
+            "rendered_template": "Must have greater than or equal to $min_value and less than or equal to $max_value rows.",  # noqa: E501 # FIXME CoP
         },
         "expect_column_max_to_be_between": {
             "value": 6,
-            "rendered_template": "$column maximum value must be greater than or equal to $min_value and less than or equal to $max_value.",  # noqa: E501
+            "rendered_template": "$column maximum value must be greater than or equal to $min_value and less than or equal to $max_value.",  # noqa: E501 # FIXME CoP
         },
         "expect_column_median_to_be_between": {
             "value": 1,
-            "rendered_template": "$column median must be greater than or equal to $min_value and less than or equal to $max_value.",  # noqa: E501
+            "rendered_template": "$column median must be greater than or equal to $min_value and less than or equal to $max_value.",  # noqa: E501 # FIXME CoP
         },
     }
     assert len(validation_result.results) == 3
@@ -117,25 +116,20 @@ def run_checkpoint_and_data_doc(
     with open(path) as f:
         data_doc_index = f.read()
 
-    # Checking for ge-success-icon tests the result table was generated and it was populated with a successful run.  # noqa: E501
+    # Checking for ge-success-icon tests the result table was generated and it was populated with a successful run.  # noqa: E501 # FIXME CoP
     assert "ge-success-icon" in data_doc_index
     assert "ge-failed-icon" not in data_doc_index
 
 
-def run_batch_head(  # noqa: C901, PLR0915
+def run_batch_head(  # noqa: C901 # FIXME CoP
     datasource_test_data: tuple[AbstractDataContext, Datasource, DataAsset, BatchRequest],
     fetch_all: bool | str,
-    n_rows: int | float | str | None,  # noqa: PYI041
+    n_rows: int | float | str | None,  # noqa: PYI041 # FIXME CoP
     success: bool,
 ) -> None:
     _, datasource, _, batch_request = datasource_test_data
-    batch_list: list[Batch] = datasource.get_batch_list_from_batch_request(
-        batch_request=batch_request
-    )
-    assert len(batch_list) > 0
+    batch = datasource.get_batch(batch_request=batch_request)
 
-    # arbitrarily select the first batch for testing
-    batch: Batch = batch_list[0]
     if success:
         assert n_rows is None or isinstance(n_rows, int)
         assert isinstance(fetch_all, bool)
@@ -143,10 +137,10 @@ def run_batch_head(  # noqa: C901, PLR0915
         execution_engine: ExecutionEngine = batch.data.execution_engine
         execution_engine.batch_manager.load_batch_list(batch_list=[batch])
 
-        metrics: Dict[Tuple[str, str, str], MetricValue] = {}
+        metrics: dict[MetricConfigurationID, MetricValue] = {}
 
         table_columns_metric: MetricConfiguration
-        results: Dict[Tuple[str, str, str], MetricValue]
+        results: dict[MetricConfigurationID, MetricValue]
 
         table_columns_metric, results = get_table_columns_metric(execution_engine=execution_engine)
         metrics.update(results)
@@ -180,7 +174,7 @@ def run_batch_head(  # noqa: C901, PLR0915
             # if n_rows is greater than the total_row_count, we only expect total_row_count rows
             elif n_rows > total_row_count:
                 assert head_data_row_count == total_row_count
-            # if n_rows is negative and abs(n_rows) is larger than total_row_count we expect zero rows  # noqa: E501
+            # if n_rows is negative and abs(n_rows) is larger than total_row_count we expect zero rows  # noqa: E501 # FIXME CoP
             elif n_rows < 0 and abs(n_rows) > total_row_count:
                 assert head_data_row_count == 0
             # if n_rows is negative, we expect all but the final abs(n_rows)
@@ -200,11 +194,11 @@ def run_batch_head(  # noqa: C901, PLR0915
             assert isinstance(head_data, HeadData)
             assert len(head_data.data.index) == 5
 
-        assert set(metrics[table_columns_metric.id]) == expected_columns  # type: ignore[arg-type]
+        assert set(metrics[table_columns_metric.id]) == expected_columns  # type: ignore[arg-type] # FIXME CoP
 
     else:
         with pytest.raises(ValidationError) as e:
-            batch.head(n_rows=n_rows, fetch_all=fetch_all)  # type: ignore[arg-type]
+            batch.head(n_rows=n_rows, fetch_all=fetch_all)  # type: ignore[arg-type] # FIXME CoP
         n_rows_validation_error = (
             "1 validation error for Head\n"
             "n_rows\n"

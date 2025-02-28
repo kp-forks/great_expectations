@@ -6,6 +6,7 @@ import pytest
 
 import great_expectations.expectations as gxe
 from great_expectations.core.expectation_suite import ExpectationSuite
+from great_expectations.data_context.data_context.cloud_data_context import CloudDataContext
 from great_expectations.data_context.store import ExpectationsStore
 from great_expectations.data_context.types.resource_identifiers import (
     ExpectationSuiteIdentifier,
@@ -195,6 +196,24 @@ _SUITE_CONFIG_WITH_EXPECTATIONS = _create_suite_config(
     [
         {
             "type": "expect_column_to_exist",
+            "description": None,
+            "id": "c8a239a6-fb80-4f51-a90e-40c38dffdf91",
+            "kwargs": {"column": "infinities"},
+            "meta": {},
+            "expectation_context": None,
+            "rendered_content": [],
+        }
+    ],
+)
+
+# this should have non-null values
+_SUITE_CONFIG_WITH_FULLY_POPULATED_EXPECTATIONS = _create_suite_config(
+    "my_suite_with_expectations",
+    "03d61d4e-003f-48e7-a3b2-f9f842384da3",
+    [
+        {
+            "type": "expect_column_to_exist",
+            "description": "some description",
             "id": "c8a239a6-fb80-4f51-a90e-40c38dffdf91",
             "kwargs": {"column": "infinities"},
             "meta": {},
@@ -225,6 +244,12 @@ _SUITE_CONFIG_WITH_EXPECTATIONS = _create_suite_config(
         pytest.param(
             {"data": _SUITE_CONFIG_WITH_EXPECTATIONS},
             _SUITE_CONFIG_WITH_EXPECTATIONS,
+            None,
+            id="null_result_format",
+        ),
+        pytest.param(
+            {"data": _SUITE_CONFIG_WITH_FULLY_POPULATED_EXPECTATIONS},
+            _SUITE_CONFIG_WITH_FULLY_POPULATED_EXPECTATIONS,
             None,
             id="null_result_format",
         ),
@@ -343,6 +368,21 @@ def _test_add_expectation_disregards_provided_id(context):
     added_expectation = updated_suite.expectations[0]
     assert UUID(added_expectation.id)
     assert added_expectation.id != provided_id
+
+
+@pytest.mark.filesystem
+def test_add_adds_ids_to_suite_and_expectations(empty_data_context):
+    context = empty_data_context
+
+    expectation_a = gxe.ExpectColumnValuesToBeInSet(column="a", value_set=[1, 2, 3])
+    expectation_b = gxe.ExpectColumnMaxToBeBetween(column="b", min_value=0, max_value=10)
+    suite = ExpectationSuite("test-suite", expectations=[expectation_a, expectation_b])
+
+    assert all(obj.id is None for obj in (expectation_a, expectation_b, suite))
+
+    suite = context.suites.add(suite)
+
+    assert all(obj.id is not None for obj in (expectation_a, expectation_b, suite))
 
 
 @pytest.mark.cloud
@@ -494,6 +534,8 @@ def _test_delete_expectation_raises_error_for_missing_expectation(context):
     # Assert
     updated_suite_dict = store.get(key=store.get_key(name=suite.name, id=suite.id))
     updated_suite = ExpectationSuite(**updated_suite_dict)
+    if isinstance(context, CloudDataContext):
+        updated_suite.render()
     assert suite == updated_suite
     assert len(updated_suite.expectations) == 1
 

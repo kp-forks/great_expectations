@@ -33,8 +33,8 @@ class ExpectMulticolumnValuesToBeUnique(ColumnMapExpectation):
 
      Note that all instances of any duplicates are considered failed
 
-     expect_multicolumnvalues_to_be_unique is a \
-     [Column Map Expectation](https://docs.greatexpectations.io/docs/guides/expectations/creating_custom_expectations/how_to_create_custom_column_map_expectations).
+     ExpectMulticolumnvaluesToBeUnique is a \
+     Column Map Expectation.
 
      For example:
      ::
@@ -67,7 +67,7 @@ class ExpectMulticolumnValuesToBeUnique(ColumnMapExpectation):
          An [ExpectationSuiteValidationResult](https://docs.greatexpectations.io/docs/terms/validation_result)
 
          Exact fields vary depending on the values passed to result_format, catch_exceptions, and meta.
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     column_list: Union[tuple, list]
     ignore_row_if: str = "all_values_are_missing"

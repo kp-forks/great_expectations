@@ -9,13 +9,22 @@ import QueryAsset from './_query_asset.md';
 
 Data Assets are collections of records within a Data Source.  With SQL Data Sources, a Data Asset can consist of the records from a specific table or the records from a specified query.
 
-### Prerequisites
+### Prerequisites {#prerequisites-data-asset}
 - <PreReqDataContext/>.  The variable `context` is used for your Data Context in the following example code.
 - <PrereqDataSource/>.
 
-<Tabs>
+### Procedure {#procedure-data-asset}
 
-<TabItem value="procedure" label="Procedure">
+<Tabs 
+   queryString="procedure"
+   defaultValue="instructions"
+   values={[
+      {value: 'instructions', label: 'Instructions'},
+      {value: 'sample_code', label: 'Sample code'}
+   ]}
+>
+
+<TabItem value="instructions" label="Instructions">
 
 1. Retrieve your Data Source.
 
@@ -40,7 +49,7 @@ Data Assets are collections of records within a Data Source.  With SQL Data Sour
 
 4. Optional. Verify that your Data Asset was added to your Data Source:
 
-   ```python
+   ```python title="Python"
    print(data_source.assets)
    ```
    

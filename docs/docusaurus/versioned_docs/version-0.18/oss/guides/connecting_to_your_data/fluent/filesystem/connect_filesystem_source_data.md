@@ -3,8 +3,7 @@ sidebar_label: "Connect to filesystem Data Assets"
 title: "Connect to filesystem Data Assets"
 id: connect_filesystem_source_data
 description: Connect to filesystem Data Assets.
-toc_min_heading_level: 2
-toc_max_heading_level: 2
+hide_table_of_contents: true
 ---
 
 import TechnicalTag from '../../../../../reference/learn/term_tags/_tag.mdx';
@@ -471,7 +470,7 @@ Run the following Python code to read the data in individual files directly into
 
 Modify the following code to connect to your <TechnicalTag tag="datasource" text="Data Source"/>. If you don't have data available for testing, you can use the [NYC taxi data](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page). The NYC taxi data is open source, and it is updated every month. An individual record in the data corresponds to one taxi trip.
 
-:::caution
+:::caution Caution
 Do not include sensitive information such as credentials in the configuration when you connect to your Data Source. This information appears as plain text in the database. If you must include credentials or a full connection string, GX recommends using a [config variables file](https://docs.greatexpectations.io/docs/oss/guides/setup/configuring_data_contexts/how_to_configure_credentials/).
 :::
 

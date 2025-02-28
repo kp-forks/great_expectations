@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
@@ -37,13 +38,14 @@ def submit(event: Event) -> None:
         pass
 
 
-def init(  # noqa: PLR0913
+def init(  # noqa: PLR0913 # FIXME CoP
     enable: bool,
     user_id: Optional[UUID] = None,
     data_context_id: Optional[UUID] = None,
     organization_id: Optional[UUID] = None,
     oss_id: Optional[UUID] = None,
     cloud_mode: bool = False,
+    user_agent_str: Optional[str] = None,
 ):
     """Initializes the analytics platform client."""
     conf = {}
@@ -55,10 +57,26 @@ def init(  # noqa: PLR0913
         conf["organization_id"] = organization_id
     if oss_id:
         conf["oss_id"] = oss_id
-    update_config(config=Config(cloud_mode=cloud_mode, **conf))
+    update_config(
+        config=Config(
+            cloud_mode=cloud_mode,
+            user_agent_str=user_agent_str,
+            **conf,
+        )
+    )
 
+    enable = enable and not _in_gx_ci()
     posthog.disabled = not enable
     if enable:
         posthog.debug = ENV_CONFIG.posthog_debug
         posthog.project_api_key = ENV_CONFIG.posthog_project_api_key
         posthog.host = ENV_CONFIG.posthog_host
+
+
+def _in_gx_ci() -> bool:
+    return (
+        # GitHub Actions
+        os.getenv("GITHUB_REPOSITORY") == "great-expectations/great_expectations"
+        # Azure Pipelines
+        or os.getenv("System.TeamProject") == "great_expectations"
+    )

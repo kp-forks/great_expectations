@@ -29,6 +29,7 @@ from docs.sphinx_api_docs_source.build_sphinx_api_docs import SphinxInvokeDocsBu
 
 if TYPE_CHECKING:
     from invoke.context import Context
+    from typing_extensions import Literal
 
 
 LOGGER = logging.getLogger(__name__)
@@ -51,11 +52,6 @@ _PTY_HELP_DESC = "Whether or not to use a pseudo terminal"
         "check": _CHECK_HELP_DESC,
         "exclude": _EXCLUDE_HELP_DESC,
         "path": _PATH_HELP_DESC,
-        "isort": "Use `isort` to sort packages. Default behavior.",
-        "ruff": (
-            "Use `ruff` instead of `isort` to sort imports."
-            " This will eventually become the default."
-        ),
         "pty": _PTY_HELP_DESC,
     }
 )
@@ -64,29 +60,18 @@ def sort(
     path: str = ".",
     check: bool = False,
     exclude: str | None = None,
-    ruff: bool = False,  # isort is the current default
-    isort: bool = False,
     pty: bool = True,
 ):
     """Sort module imports."""
-    if ruff and isort:
-        raise invoke.Exit("cannot use both `--ruff` and `--isort`", code=1)  # noqa: TRY003
-    if not isort:
-        cmds = [
-            "ruff",
-            "check",
-            path,
-            "--select I",
-            "--diff" if check else "--fix",
-        ]
-        if exclude:
-            cmds.extend(["--extend-exclude", exclude])
-    else:
-        cmds = ["isort", path]
-        if check:
-            cmds.append("--check-only")
-        if exclude:
-            cmds.extend(["--skip", exclude])
+    cmds = [
+        "ruff",
+        "check",
+        path,
+        "--select I",
+        "--diff" if check else "--fix",
+    ]
+    if exclude:
+        cmds.extend(["--extend-exclude", exclude])
     ctx.run(" ".join(cmds), echo=True, pty=pty)
 
 
@@ -138,6 +123,7 @@ def lint(
     fmt_: bool = True,
     fix: bool = False,
     unsafe_fixes: bool = False,
+    output_format: Literal["full", "concise", "github"] | None = None,
     watch: bool = False,
     pty: bool = True,
 ):
@@ -153,6 +139,10 @@ def lint(
         cmds.append("--unsafe-fixes")
     if watch:
         cmds.append("--watch")
+    if output_format:
+        cmds.append(f"--output-format={output_format}")
+    elif os.getenv("GITHUB_ACTIONS"):
+        cmds.append("--output-format=github")
     ctx.run(" ".join(cmds), echo=True, pty=pty)
 
 
@@ -632,6 +622,7 @@ def type_schema(  # noqa: C901 - too complex
         core.ExpectColumnValuesToNotMatchLikePatternList,
         core.ExpectColumnValuesToNotMatchRegex,
         core.ExpectColumnValuesToNotMatchRegexList,
+        core.UnexpectedRowsExpectation,
     ]
     for x in supported_expectations:
         schema_path = expectation_dir.joinpath(f"{x.__name__}.json")
@@ -769,31 +760,6 @@ def _exit_with_error_if_not_run_from_correct_dir(
 
 
 @invoke.task(
-    aliases=("links",),
-    help={"skip_external": "Skip external link checks (is slow), default is True"},
-)
-def link_checker(ctx: Context, skip_external: bool = True):
-    """Checks the Docusaurus docs for broken links"""
-    import docs.checks.docs_link_checker as checker
-
-    path = pathlib.Path("docs/docusaurus/docs")
-    docs_root = pathlib.Path("docs/docusaurus/docs")
-    static_root = pathlib.Path("docs/docusaurus/static")
-    site_prefix: str = "docs"
-    static_prefix: str = "static"
-
-    code, message = checker.scan_docs(
-        path=path,
-        docs_root=docs_root,
-        static_root=static_root,
-        site_prefix=site_prefix,
-        static_prefix=static_prefix,
-        skip_external=skip_external,
-    )
-    raise invoke.Exit(message, code)
-
-
-@invoke.task(
     aliases=("automerge",),
 )
 def show_automerges(ctx: Context):
@@ -838,6 +804,7 @@ class TestDependencies(NamedTuple):
 MARKER_DEPENDENCY_MAP: Final[Mapping[str, TestDependencies]] = {
     "athena": TestDependencies(("reqs/requirements-dev-athena.txt",)),
     "aws_deps": TestDependencies(("reqs/requirements-dev-lite.txt",)),
+    "bigquery": TestDependencies(("reqs/requirements-dev-bigquery.txt",)),
     "clickhouse": TestDependencies(("reqs/requirements-dev-clickhouse.txt",)),
     "cloud": TestDependencies(
         (
@@ -926,6 +893,14 @@ MARKER_DEPENDENCY_MAP: Final[Mapping[str, TestDependencies]] = {
         services=("spark",),
         extra_pytest_args=("--spark",),
     ),
+    "spark_connect": TestDependencies(
+        requirement_files=(
+            "reqs/requirements-dev-spark.txt",
+            "reqs/requirements-dev-spark-connect.txt",
+        ),
+        services=("spark",),
+        extra_pytest_args=("--spark_connect",),
+    ),
     "trino": TestDependencies(
         ("reqs/requirements-dev-trino.txt",),
         services=("trino",),
@@ -958,13 +933,9 @@ def _tokenize_marker_string(marker_string: str) -> Generator[str, None, None]:
     tokens = marker_string.split()
     if len(tokens) == 1:
         yield tokens[0]
-    elif (
-        marker_string
-        == "athena or clickhouse or openpyxl or pyarrow or project or sqlite or aws_creds"
-    ):
+    elif marker_string == "athena or openpyxl or pyarrow or project or sqlite or aws_creds":
         yield "aws_creds"
         yield "athena"
-        yield "clickhouse"
         yield "openpyxl"
         yield "pyarrow"
         yield "project"
@@ -991,15 +962,19 @@ def _get_marker_dependencies(markers: str | Sequence[str]) -> list[TestDependenc
         "markers": "Optional marker to install dependencies for. Can be specified multiple times.",
         "requirements_dev": "Short name of `requirements-dev-*.txt` file to install, e.g. test, spark, cloud, etc. Can be specified multiple times.",  # noqa: E501
         "constraints": "Optional flag to install dependencies with constraints, default True",
+        "gx_install": "Install the local version of Great Expectations.",
+        "editable_install": "Install an editable local version of Great Expectations.",
+        "force_reinstall": "Force re-installation of dependencies.",
     },
 )
-def deps(
+def deps(  # noqa: C901 - too complex
     ctx: Context,
     markers: list[str],
     requirements_dev: list[str],
     constraints: bool = True,
     gx_install: bool = False,
     editable_install: bool = False,
+    force_reinstall: bool = False,
 ):
     """
     Install dependencies for development and testing.
@@ -1021,6 +996,9 @@ def deps(
         cmds.append("-e .")
     elif gx_install:
         cmds.append(".")
+
+    if force_reinstall:
+        cmds.append("--force-reinstall")
 
     req_files: list[str] = ["requirements.txt"]
 
@@ -1076,7 +1054,7 @@ def docs_snippet_tests(
 @invoke.task(
     help={
         "pty": _PTY_HELP_DESC,
-        "reports": "Generate coverage reports to be uploaded to codecov",
+        "reports": "Generate coverage & result reports to be uploaded to codecov",
         "W": "Warnings control",
     },
     iterable=["service_names", "up_services", "verbose"],
@@ -1117,7 +1095,9 @@ def ci_tests(  # noqa: C901 - too complex (9)
         pytest_options.append(f"--timeout={timeout}")
 
     if reports:
-        pytest_options.extend(["--cov=great_expectations", "--cov-report=xml"])
+        pytest_options.extend(
+            ["--cov=great_expectations", "--cov-report=xml", "--junitxml=junit.xml"]
+        )
 
     if verbose:
         pytest_options.append("-vv")

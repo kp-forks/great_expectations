@@ -51,8 +51,8 @@ class ColumnSectionRenderer(Renderer):
             elif isinstance(candidate_object, ExpectationValidationResult):
                 return candidate_object.expectation_config.kwargs["column"]
             else:
-                raise ValueError(  # noqa: TRY003, TRY004
-                    "Provide a column section renderer an expectation, list of expectations, evr, or list of evrs."  # noqa: E501
+                raise ValueError(  # noqa: TRY003, TRY004 # FIXME CoP
+                    "Provide a column section renderer an expectation, list of expectations, evr, or list of evrs."  # noqa: E501 # FIXME CoP
                 )
         except KeyError:
             return "Table-Level Expectations"
@@ -91,7 +91,7 @@ class ProfilingResultsColumnSectionRenderer(ColumnSectionRenderer):
 
     # Note: Seems awkward to pass section_name and column_type into this renderer.
     # Can't we figure that out internally?
-    def render(self, evrs, section_name=None, column_type=None):
+    def render(self, evrs, section_name=None, column_type=None):  # type: ignore[explicit-override] # FIXME
         if section_name is None:
             column = self._get_column_name(evrs)
         else:
@@ -112,12 +112,12 @@ class ProfilingResultsColumnSectionRenderer(ColumnSectionRenderer):
 An unexpected Exception occurred during data docs rendering.  Because of this error, certain parts of data docs will \
 not be rendered properly and/or may not appear altogether.  Please use the trace, included in this message, to \
 diagnose and repair the underlying issue.  Detailed information follows:
-                """  # noqa: E501
+                """  # noqa: E501 # FIXME CoP
                 exception_traceback = traceback.format_exc()
                 exception_message += (
                     f'{type(e).__name__}: "{e!s}".  Traceback: "{exception_traceback}".'
                 )
-                logger.error(exception_message)  # noqa: TRY400
+                logger.error(exception_message)  # noqa: TRY400 # FIXME CoP
 
         # NOTE : Some render* functions return None so we filter them out
         populated_content_blocks = list(filter(None, content_blocks))
@@ -160,7 +160,7 @@ diagnose and repair the underlying issue.  Detailed information follows:
                         "string_template": {
                             "template": f"Type: {column_type}",
                             "tooltip": {
-                                "content": "expect_column_values_to_be_of_type <br>expect_column_values_to_be_in_type_list",  # noqa: E501
+                                "content": "expect_column_values_to_be_of_type <br>expect_column_values_to_be_in_type_list",  # noqa: E501 # FIXME CoP
                             },
                             "tag": "h6",
                             "styling": {"classes": ["mt-1", "mb-0"]},
@@ -221,7 +221,7 @@ diagnose and repair the underlying issue.  Detailed information follows:
                 **{
                     "content_block_type": "bullet_list",
                     "header": RenderedStringTemplateContent(
-                        **{  # type: ignore[arg-type]
+                        **{  # type: ignore[arg-type] # FIXME CoP
                             "content_block_type": "string_template",
                             "string_template": {
                                 "template": 'Expectation types <span class="mr-3 triangle"></span>',
@@ -434,7 +434,7 @@ class ValidationResultsColumnSectionRenderer(ColumnSectionRenderer):
         )
         return [], new_block
 
-    def render(self, validation_results, suite_parameters=None):
+    def render(self, validation_results, suite_parameters=None):  # type: ignore[explicit-override] # FIXME
         column = self._get_column_name(validation_results)
         content_blocks = []
         remaining_evrs, content_block = self._render_header(validation_results)
@@ -489,7 +489,7 @@ class ExpectationSuiteColumnSectionRenderer(ColumnSectionRenderer):
 
         return [], new_block
 
-    def render(self, expectations):
+    def render(self, expectations):  # type: ignore[explicit-override] # FIXME
         column = self._get_column_name(expectations)
 
         content_blocks = []

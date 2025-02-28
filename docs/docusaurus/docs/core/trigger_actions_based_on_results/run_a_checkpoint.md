@@ -13,15 +13,29 @@ Running a Checkpoint will cause it to validate all of its Validation Definitions
 
 At runtime, a Checkpoint can take in a `batch_parameters` dictionary that selects the Batch to validate from each Validation Definition.  A Checkpoint will also accept an `expectation_parameters` dictionary that provides values for the parameters of the any Expectations that have been configured to accept parameters at runtime.
 
-<h2>Prerequisites</h2>
+## Prerequisites
+
 - <PrereqPythonInstalled/>.
 - <PrereqGxInstalled/>.
 - <PrereqPreconfiguredDataContext/>.
 - <PrereqCheckpoint/>.
 
-<Tabs>
+### Procedure
 
-<TabItem value="procedure" label="Procedure">
+:::tip Generate a code snippet to validate GX-managed Expectations
+If you want to use the API to run a validation for [GX-managed Expectations](/cloud/expectations/manage_expectations.md#gx-managed-vs-api-managed-expectations) in a GX Cloud deployment, you can use the GX Cloud UI to generate the necessary code. For the Data Asset of interest, go to the **Validations** tab, click the code snippet icon next to the **Validate** button, and then click **Generate snippet**.
+:::
+
+<Tabs 
+   queryString="procedure"
+   defaultValue="instructions"
+   values={[
+      {value: 'instructions', label: 'Instructions'},
+      {value: 'sample_code', label: 'Sample code'}
+   ]}
+>
+
+<TabItem value="instructions" label="Instructions">
 
 In this procedure your Data Context is assumed to be stored in the variable `context` and your Checkpoint is assumed to be stored in the variable `checkpoint`.
 
@@ -43,59 +57,37 @@ In this procedure your Data Context is assumed to be stored in the variable `con
 
    You then pass a dictionary to the `expectation_parameters` argument of a Checkpoint's `run` method.  The contents of this dictionary consist of keys that were defined for parameters when the Checkpoint's Expectations were created, paired with the values that should be used for the corresponding parmeters when the Checkpoint runs.
 
-   Below is an example of an `ExpectColumnValuesToBeBetween` Expectation that is set to accept parameters at runtime, and an `expectation_parameters` dictionary that provides those parameters:
+   Below is an example of an `ExpectColumnMaxToBeBetween` Expectation that is set to accept parameters at runtime:
 
-   ```python title="Python"
-   expectation = ExpectColumnValuesToBeBetween(
-      column="fare",
-      min_value={"$PARAMETER": "expect_fare_minimum_to_be_above"},
-      max_value={"$PARAMETER": "expect_fare_maximum_to_be_below"}
-   )
+   ```python title="Python" name="docs/docusaurus/docs/core/trigger_actions_based_on_results/_examples/run_a_checkpoint.py - example Expectation"
+   ```
    
-   expectation_parameters = {
-      "expect_fare_minimum_to_be_above": 5.00,
-      "expect_fare_maximum_to_be_below": 1000.00,
-   }
+   And this is an `expectation_parameters` dictionary that provides those parameters:
+   
+   ```python title="Python" name="docs/docusaurus/docs/core/trigger_actions_based_on_results/_examples/run_a_checkpoint.py - define Expectation Parameters"
    ```
 
-  If none of the Expectations in a Validation Definition are configured to accept runtime Expectation parameters, the `expectation_parameters` argument can be omitted from the Checkpoint's `run(...)` method.
-
+   If none of the Expectations in a Validation Definition are configured to accept runtime Expectation parameters, the `expectation_parameters` argument can be omitted from the Checkpoint's `run(...)` method.
+   
    For more information on configuring an Expectation to accept runtime parameters, how to set the lookup key for an Expectation's parameters, and additional examples of how to format an `expectation_parameters` dictionary see the runtime guidance under [Create an Expectation](/core/define_expectations/create_an_expectation.md).
 
 3. Run the Checkpoint.
 
    A Checkpoint is executed through its `run(...)` method.  Pass the Batch and Expectation parameters to the `batch_parameters` and `expectation_parameters` arguments of the Checkpoint's ` run(...)` method:
 
-   ```python
-   validation_results = checkpoint.run(
-      batch_parameters=batch_parameters,
-      expectation_parameters=expectation_parameters
-   )
+   ```python title="Python" name="docs/docusaurus/docs/core/trigger_actions_based_on_results/_examples/run_a_checkpoint.py - run a Checkpoint"
    ```
    
    After the Checkpoint runs it will pass the Validation Results that are generated to its Actions and execute them.  Finally, the Validation Results will be returned by the `run(...)` method. 
+
+   For more information about Validation Results, what they contain, and how to adjust their verbosity see [Choose result format](../trigger_actions_based_on_results/choose_a_result_format/choose_a_result_format.md).
+
 
 </TabItem>
 
 <TabItem value="sample_code" label="Sample code">
 
-```python title="Python"
-import great_expectations as gx
-
-context = gx.get_context()
-checkpoint = context.checkpoints.get("my_checkpoint")
-
-batch_parameters = {"day": 1, "month": 12, "year": 2024}
-   
-expectation_parameters = {
-   "expect_fare_minimum_to_be_above": 5.00,
-   "expect_fare_maximum_to_be_below": 1000.00,
-}
-
-validation_results = checkpoint.run(
-   batch_parameters=batch_parameters,
-   expectation_parameters=expectation_parameters
-)
+```python title="Python" name="docs/docusaurus/docs/core/trigger_actions_based_on_results/_examples/run_a_checkpoint.py - full code example"
 ```
 
 </TabItem>

@@ -21,7 +21,7 @@ from great_expectations.exceptions.exceptions import (
 from tests.test_utils import working_directory
 
 GX_CLOUD_PARAMS_ALL = {
-    "cloud_base_url": "http://hello.com",
+    "cloud_base_url": "localhost:7000",
     "cloud_organization_id": "bd20fead-2c31-4392-bcd1-f1e87ad5a79c",
     "cloud_access_token": "i_am_a_token",
 }
@@ -33,7 +33,7 @@ GX_CLOUD_PARAMS_REQUIRED = {
 
 @pytest.fixture()
 def set_up_cloud_envs(monkeypatch):
-    monkeypatch.setenv("GX_CLOUD_BASE_URL", "http://hello.com")
+    monkeypatch.setenv("GX_CLOUD_BASE_URL", "localhost:7000")
     monkeypatch.setenv("GX_CLOUD_ORGANIZATION_ID", "bd20fead-2c31-4392-bcd1-f1e87ad5a79c")
     monkeypatch.setenv("GX_CLOUD_ACCESS_TOKEN", "i_am_a_token")
 
@@ -50,13 +50,11 @@ def test_base_context(clear_env_vars):
     config: DataContextConfig = DataContextConfig(
         config_version=3.0,
         plugins_directory=None,
-        suite_parameter_store_name="suite_parameter_store",
         expectations_store_name="expectations_store",
         checkpoint_store_name="checkpoint_store",
         stores={
             "expectations_store": {"class_name": "ExpectationsStore"},
             "checkpoint_store": {"class_name": "CheckpointStore"},
-            "suite_parameter_store": {"class_name": "SuiteParameterStore"},
             "validation_result_store": {"class_name": "ValidationResultsStore"},
             "validation_definition_store": {"class_name": "ValidationDefinitionStore"},
         },
@@ -78,13 +76,11 @@ def test_base_context__with_overridden_yml(tmp_path: pathlib.Path, clear_env_var
     config: DataContextConfig = DataContextConfig(
         config_version=3.0,
         plugins_directory=None,
-        suite_parameter_store_name="new_suite_parameter_store",
         expectations_store_name="new_expectations_store",
         checkpoint_store_name="new_checkpoint_store",
         stores={
             "new_expectations_store": {"class_name": "ExpectationsStore"},
             "new_checkpoint_store": {"class_name": "CheckpointStore"},
-            "new_suite_parameter_store": {"class_name": "SuiteParameterStore"},
             "new_validation_result_store": {"class_name": "ValidationResultsStore"},
         },
         validation_results_store_name="new_validation_result_store",
@@ -111,13 +107,11 @@ def test_base_context_invalid_root_dir(clear_env_vars, tmp_path):
     config: DataContextConfig = DataContextConfig(
         config_version=3.0,
         plugins_directory=None,
-        suite_parameter_store_name="suite_parameter_store",
         expectations_store_name="expectations_store",
         checkpoint_store_name="checkpoint_store",
         stores={
             "expectations_store": {"class_name": "ExpectationsStore"},
             "checkpoint_store": {"class_name": "CheckpointStore"},
-            "suite_parameter_store": {"class_name": "SuiteParameterStore"},
             "validation_result_store": {"class_name": "ValidationResultsStore"},
         },
         validation_results_store_name="validation_result_store",
@@ -176,7 +170,7 @@ def test_cloud_context_with_in_memory_config_overrides(
         return_value=empty_ge_cloud_data_context_config,
     ):
         context = gx.get_context(
-            cloud_base_url="http://hello.com",
+            cloud_base_url="localhost:7000",
             cloud_organization_id="bd20fead-2c31-4392-bcd1-f1e87ad5a79c",
             cloud_access_token="i_am_a_token",
         )
@@ -186,13 +180,11 @@ def test_cloud_context_with_in_memory_config_overrides(
         config: DataContextConfig = DataContextConfig(
             config_version=3.0,
             plugins_directory=None,
-            suite_parameter_store_name="new_suite_parameter_store",
             expectations_store_name="new_expectations_store",
             checkpoint_store_name="new_checkpoint_store",
             stores={
                 "new_expectations_store": {"class_name": "ExpectationsStore"},
                 "new_checkpoint_store": {"class_name": "CheckpointStore"},
-                "new_suite_parameter_store": {"class_name": "SuiteParameterStore"},
                 "new_validation_result_store": {"class_name": "ValidationResultsStore"},
             },
             validation_results_store_name="new_validation_result_store",
@@ -200,7 +192,7 @@ def test_cloud_context_with_in_memory_config_overrides(
         )
         context = gx.get_context(
             project_config=config,
-            cloud_base_url="http://hello.com",
+            cloud_base_url="localhost:7000",
             cloud_organization_id="bd20fead-2c31-4392-bcd1-f1e87ad5a79c",
             cloud_access_token="i_am_a_token",
         )

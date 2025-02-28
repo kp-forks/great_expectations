@@ -117,7 +117,7 @@ def test_construct_csv_asset_directly():
 @pytest.mark.aws_deps
 def test_invalid_connect_options(pandas_s3_datasource: PandasS3Datasource, aws_credentials):
     with pytest.raises(pydantic.ValidationError) as exc_info:
-        pandas_s3_datasource.add_csv_asset(  # type: ignore[call-arg]
+        pandas_s3_datasource.add_csv_asset(  # type: ignore[call-arg] # FIXME CoP
             name="csv_asset",
             extra_field="invalid",
         )
@@ -185,7 +185,7 @@ def test_invalid_connect_options_value(
         param({}, id="default connect options"),
         param({"s3_prefix": ""}, id="prefix ''"),
         param({"s3_delimiter": "/"}, id="s3_delimiter '/'"),
-        # param({"s3_prefix": "non_default"}, id="s3_prefix 'non_default'"), # TODO: what prefix should I test?  # noqa: E501
+        # param({"s3_prefix": "non_default"}, id="s3_prefix 'non_default'"), # TODO: what prefix should I test?  # noqa: E501 # FIXME CoP
         param(
             {"s3_prefix": "", "s3_delimiter": "/", "s3_max_keys": 20},
             id="all options",
@@ -279,16 +279,14 @@ def test_add_csv_asset_with_recursive_file_discovery_to_datasource(
         s3_recursive_file_discovery=False,
     )
     found_files_without_recursion = len(
-        no_recursion_asset.get_batch_list_from_batch_request(
-            no_recursion_asset.build_batch_request()
-        )
+        no_recursion_asset.get_batch_identifiers_list(no_recursion_asset.build_batch_request())
     )
     recursion_asset = pandas_s3_datasource.add_csv_asset(
         name="csv_asset_recursive",
         s3_recursive_file_discovery=True,
     )
     found_files_with_recursion = len(
-        recursion_asset.get_batch_list_from_batch_request(recursion_asset.build_batch_request())
+        recursion_asset.get_batch_identifiers_list(recursion_asset.build_batch_request())
     )
     # Only 1 additional file was added to the subfolder
     assert found_files_without_recursion + 1 == found_files_with_recursion

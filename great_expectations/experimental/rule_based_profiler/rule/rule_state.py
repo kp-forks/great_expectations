@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Dict, List, Optional
 
-import great_expectations.exceptions as gx_exceptions
-from great_expectations.core.domain import Domain  # noqa: TCH001
+from great_expectations.core.domain import Domain  # noqa: TCH001 # FIXME CoP
+from great_expectations.experimental.rule_based_profiler.exceptions import (
+    ProfilerConfigurationError,
+)
 from great_expectations.experimental.rule_based_profiler.parameter_container import (
     ParameterContainer,
 )
@@ -19,9 +21,9 @@ class RuleState:
     with currently loaded configuration of "Rule" components ("DomainBuilder" object, "ParameterBuilder" objects, and
     "ExpectationConfigurationBuilder" objects).  Using "RuleState" with corresponding flags is sufficient for generating
     outputs for different purposes (in raw and aggregated form) from available "Domain" objects and computed parameters.
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         rule: Optional[Rule] = None,
         domains: Optional[List[Domain]] = None,
@@ -35,7 +37,7 @@ class RuleState:
             domains: List of Domain objects, which DomainBuilder of associated Rule generated.
             variables: attribute name/value pairs (part of state, relevant for associated Rule).
             parameters: Dictionary of ParameterContainer objects corresponding to all Domain objects in memory.
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         self._rule = rule
 
         if domains is None:
@@ -143,10 +145,10 @@ class RuleState:
         if not allow_duplicates and domain.id in [
             domain_cursor.id for domain_cursor in self.domains
         ]:
-            raise gx_exceptions.ProfilerConfigurationError(  # noqa: TRY003
+            raise ProfilerConfigurationError(  # noqa: TRY003 # FIXME CoP
                 f"""Error: Domain\n{domain}\nalready exists.  In order to add it, either pass "allow_duplicates=True" \
 or call "RuleState.remove_domain_if_exists()" with Domain having ID equal to "{domain.id}" as argument first.
-"""  # noqa: E501
+"""  # noqa: E501 # FIXME CoP
             )
 
         self.domains.append(domain)
@@ -167,11 +169,11 @@ or call "RuleState.remove_domain_if_exists()" with Domain having ID equal to "{d
         overwrite: bool = True,
     ) -> None:
         if not overwrite and domain.id in self.parameters:
-            raise gx_exceptions.ProfilerConfigurationError(  # noqa: TRY003
+            raise ProfilerConfigurationError(  # noqa: TRY003 # FIXME CoP
                 f"""Error: ParameterContainer for Domain\n{domain}\nalready exists.  In order to overwrite it, either \
 pass "overwrite=True" or call "RuleState.remove_parameter_container_from_domain()" with Domain having ID equal to \
 "{domain.id}" as argument first.
-"""  # noqa: E501
+"""  # noqa: E501 # FIXME CoP
             )
 
         parameter_container = ParameterContainer(parameter_nodes=None)

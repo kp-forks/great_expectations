@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from typing import ClassVar, List, Optional
 from uuid import UUID
 
+from great_expectations import __version__ as gx_version
 from great_expectations.analytics.config import get_config
+from great_expectations.compatibility.typing_extensions import override
 
 
 @dataclass(frozen=True)
@@ -13,10 +15,11 @@ class Action:
 
     Attributes:
         name: A description of what happened. For example (<object>.<verb>) "validation_result.saved" or "token.deleted"
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     name: str
 
+    @override
     def __repr__(self):
         return self.name
 
@@ -32,7 +35,7 @@ class Event:
     action: Action
 
     @property
-    def data_context_id(self) -> UUID:
+    def data_context_id(self) -> UUID | None:
         return get_config().data_context_id
 
     @property
@@ -40,7 +43,7 @@ class Event:
         return get_config().organization_id
 
     @property
-    def oss_id(self) -> UUID:
+    def oss_id(self) -> UUID | None:
         return get_config().oss_id
 
     @property
@@ -48,9 +51,13 @@ class Event:
         return get_config().user_id
 
     @property
-    def distinct_id(self) -> UUID:
+    def user_agent_str(self) -> str | None:
+        return get_config().user_agent_str
+
+    @property
+    def distinct_id(self) -> UUID | None:
         """The distinct_id is the primary key for identifying
-        anlaytics events. It is the user_id if it is set
+        analytics events. It is the user_id if it is set
         (e.g. in a Cloud context), otherwise the oss_id.
         """
         return self.user_id or self.oss_id
@@ -60,7 +67,7 @@ class Event:
     def __post_init__(self):
         allowed_actions = self.get_allowed_actions()
         if allowed_actions is not None and self.action not in self.get_allowed_actions():
-            raise ValueError(f"Action [{self.action}] must be one of {self.get_allowed_actions()}")  # noqa: TRY003
+            raise ValueError(f"Action [{self.action}] must be one of {self.get_allowed_actions()}")  # noqa: TRY003 # FIXME CoP
 
     @classmethod
     def get_allowed_actions(cls):
@@ -70,7 +77,9 @@ class Event:
         props = {
             "data_context_id": self.data_context_id,
             "oss_id": self.oss_id,
+            "gx_version": gx_version,
             "service": "gx-core",
+            "user_agent_str": self.user_agent_str,
         }
         if self.user_id is not None:
             props.update({"user_id": self.user_id, "organization_id": self.organization_id})

@@ -31,7 +31,7 @@ class TableHead(TableMetricProvider):
     default_kwarg_values = {"n_rows": 5, "fetch_all": False}
 
     @metric_value(engine=PandasExecutionEngine)
-    def _pandas(  # noqa: PLR0913
+    def _pandas(
         cls,
         execution_engine: PandasExecutionEngine,
         metric_domain_kwargs: dict,
@@ -45,14 +45,14 @@ class TableHead(TableMetricProvider):
         if metric_value_kwargs.get("fetch_all", cls.default_kwarg_values["fetch_all"]):
             return df
         n_rows: int = (
-            metric_value_kwargs.get("n_rows")
+            metric_value_kwargs.get("n_rows")  # type: ignore[assignment] # FIXME expected 'int', got 'Any | None'
             if metric_value_kwargs.get("n_rows") is not None
             else cls.default_kwarg_values["n_rows"]
         )
         return df.head(n=n_rows)
 
     @metric_value(engine=SqlAlchemyExecutionEngine)
-    def _sqlalchemy(  # noqa: PLR0913
+    def _sqlalchemy(
         cls,
         execution_engine: SqlAlchemyExecutionEngine,
         metric_domain_kwargs: dict,
@@ -65,7 +65,7 @@ class TableHead(TableMetricProvider):
         )
 
         n_rows: int = (
-            metric_value_kwargs.get("n_rows")
+            metric_value_kwargs.get("n_rows")  # type: ignore[assignment] # FIXME expected 'int', got 'Any | None'
             if metric_value_kwargs.get("n_rows") is not None
             else cls.default_kwarg_values["n_rows"]
         )
@@ -75,7 +75,7 @@ class TableHead(TableMetricProvider):
         if metric_value_kwargs["fetch_all"]:
             limit = None
 
-        selectable = sa.select("*").select_from(selectable).limit(limit).selectable
+        selectable = sa.select("*").select_from(selectable).limit(limit).selectable  # type: ignore[assignment,arg-type] # FIXME CoP
 
         try:
             with execution_engine.get_connection() as con:
@@ -90,10 +90,10 @@ class TableHead(TableMetricProvider):
                 MetricConfiguration("table.columns", metric_domain_kwargs)
             )
             df = pd.DataFrame(columns=columns)
-        return df  # type: ignore[return-value]
+        return df  # type: ignore[return-value] # FIXME CoP
 
     @metric_value(engine=SparkDFExecutionEngine)
-    def _spark(  # noqa: PLR0913
+    def _spark(
         cls,
         execution_engine: SparkDFExecutionEngine,
         metric_domain_kwargs: dict,
@@ -109,7 +109,7 @@ class TableHead(TableMetricProvider):
             rows = df.collect()
         else:
             n_rows: int = (
-                metric_value_kwargs.get("n_rows")
+                metric_value_kwargs.get("n_rows")  # type: ignore[assignment] # FIXME expected 'int', got 'Any | None'
                 if metric_value_kwargs.get("n_rows") is not None
                 else cls.default_kwarg_values["n_rows"]
             )
@@ -119,6 +119,6 @@ class TableHead(TableMetricProvider):
                 rows = df.head(n=df.count() + n_rows)
 
         rows = [element.asDict() for element in rows]
-        df = pd.DataFrame(data=rows)  # type: ignore[assignment]
+        df = pd.DataFrame(data=rows)  # type: ignore[assignment] # FIXME CoP
 
-        return df  # type: ignore[return-value]
+        return df  # type: ignore[return-value] # FIXME CoP

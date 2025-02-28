@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 
 from great_expectations.compatibility.typing_extensions import override
-from great_expectations.core import IDDict
+from great_expectations.core.id_dict import IDDict, IDDictID
 from great_expectations.types.base import SerializableDotDict
-from great_expectations.util import convert_to_json_serializable  # noqa: TID251
+from great_expectations.util import convert_to_json_serializable  # noqa: TID251 # FIXME CoP
 
 
 class ExceptionInfo(SerializableDotDict):
@@ -52,18 +52,19 @@ class ExceptionInfo(SerializableDotDict):
         return str(fields_dict)
 
     @property
-    def id(self) -> str:
+    def id(self) -> IDDictID:
         return IDDict(self.to_json_dict()).to_id()
 
-    def __eq__(self, other):
+    def __eq__(self, other):  # type: ignore[explicit-override] # FIXME
         if not isinstance(other, self.__class__):
             # Delegate comparison to the other instance's __eq__.
             return NotImplemented
         return self.id == other.id
 
-    def __ne__(self, other):
+    def __ne__(self, other):  # type: ignore[explicit-override] # FIXME
         return not self.__eq__(other=other)
 
+    @override
     def __str__(self):
         return json.dumps(self.to_json_dict(), indent=2)
 

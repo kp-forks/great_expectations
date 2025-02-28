@@ -71,7 +71,7 @@ class ConfigStr(SecretStr):
         return TEMPLATE_STR_REGEX.search(v) is not None
 
     @classmethod
-    def _validate_template_str_format(cls, v: str) -> str | None:
+    def validate_template_str_format(cls, v: str) -> str | None:
         if cls.str_contains_config_template(v):
             return v
         raise ValueError(
@@ -85,8 +85,25 @@ class ConfigStr(SecretStr):
         # one or more validators may be yielded which will be called in the
         # order to validate the input, each validator will receive as an input
         # the value returned from the previous validator
-        yield cls._validate_template_str_format
+        yield cls.validate_template_str_format
         yield cls.validate
+
+    @classmethod
+    @override
+    def __modify_schema__(cls, field_schema: dict) -> None:
+        """Update the generated schema when used in a pydantic model."""
+        SecretStr.__modify_schema__(field_schema)
+        field_schema.update(
+            {
+                "description": "Contains config templates"
+                " to be substituted at runtime. Runtime values will never be serialized.",
+                "pattern": ".*" + TEMPLATE_STR_REGEX.pattern + ".*",
+                "examples": [
+                    "hello_${NAME}",
+                    "${MY_CFG_VAR}",
+                ],
+            }
+        )
 
 
 UriParts: TypeAlias = Literal[  # https://docs.pydantic.dev/1.10/usage/types/#url-properties
@@ -189,7 +206,7 @@ class ConfigUri(AnyUrl, ConfigStr):  # type: ignore[misc] # Mixin "validate" sig
                 cls.str_contains_config_template(part)  # type: ignore[arg-type] # is str
                 and name not in cls.ALLOWED_SUBSTITUTIONS
             ):
-                raise ValueError(  # noqa: TRY003
+                raise ValueError(  # noqa: TRY003 # FIXME CoP
                     f"Only {', '.join(allowed_substitutions)} may use config substitution; '{name}'"
                     " substitution not allowed"
                 )
@@ -211,8 +228,25 @@ class ConfigUri(AnyUrl, ConfigStr):  # type: ignore[misc] # Mixin "validate" sig
         # one or more validators may be yielded which will be called in the
         # order to validate the input, each validator will receive as an input
         # the value returned from the previous validator
-        yield ConfigStr._validate_template_str_format
+        yield ConfigStr.validate_template_str_format
         yield cls.validate  # equivalent to AnyUrl.validate
+
+    @classmethod
+    @override
+    def __modify_schema__(cls, field_schema: dict) -> None:
+        """Update the generated schema when used in a pydantic model."""
+        ConfigStr.__modify_schema__(field_schema)
+        AnyUrl.__modify_schema__(field_schema)
+        field_schema.update(
+            {
+                "description": "Contains config templates for user:password in a URI"
+                " to be substituted at runtime. Runtime values will never be serialized.",
+                "examples": [
+                    "snowflake://dickens:${PASSWORD}@host/db/schema",
+                    "snowflake://${USER}:${PASSWORD}@host/db/schema",
+                ],
+            }
+        )
 
 
 def _check_config_substitutions_needed(
@@ -223,7 +257,7 @@ def _check_config_substitutions_needed(
     """
     Given a Datasource and a dict-like mapping type return the keys whose value is a `ConfigStr` type.
     Optionally raise a warning if config substitution is needed but impossible due to a missing `_config_provider`.
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
     need_config_subs: set[str] = {k for (k, v) in options.items() if isinstance(v, ConfigStr)}
     if (
         need_config_subs
@@ -231,6 +265,6 @@ def _check_config_substitutions_needed(
         and not datasource._config_provider
     ):
         warnings.warn(
-            f"config variables '{','.join(need_config_subs)}' need substitution but no `_ConfigurationProvider` is present"  # noqa: E501
+            f"config variables '{','.join(need_config_subs)}' need substitution but no `_ConfigurationProvider` is present"  # noqa: E501 # FIXME CoP
         )
     return need_config_subs

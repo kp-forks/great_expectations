@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 class ConfigurationStore(Store):
     """
     Configuration Store provides a way to store any Marshmallow Schema compatible Configuration (using the YAML format).
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     _key_class = ConfigurationIdentifier
 
@@ -50,8 +50,8 @@ class ConfigurationStore(Store):
         runtime_environment: Optional[dict] = None,
     ) -> None:
         if not issubclass(self._configuration_class, BaseYamlConfig):
-            raise gx_exceptions.DataContextError(  # noqa: TRY003
-                "Invalid configuration: A configuration_class needs to inherit from the BaseYamlConfig class."  # noqa: E501
+            raise gx_exceptions.DataContextError(  # noqa: TRY003 # FIXME CoP
+                "Invalid configuration: A configuration_class needs to inherit from the BaseYamlConfig class."  # noqa: E501 # FIXME CoP
             )
 
         if store_backend is not None:
@@ -73,8 +73,8 @@ class ConfigurationStore(Store):
             store_name=store_name,
         )
 
-        # Gather the call arguments of the present function (include the "module_name" and add the "class_name"), filter  # noqa: E501
-        # out the Falsy values, and set the instance "_config" variable equal to the resulting dictionary.  # noqa: E501
+        # Gather the call arguments of the present function (include the "module_name" and add the "class_name"), filter  # noqa: E501 # FIXME CoP
+        # out the Falsy values, and set the instance "_config" variable equal to the resulting dictionary.  # noqa: E501 # FIXME CoP
         self._config = {
             "store_name": store_name,
             "store_backend": store_backend,
@@ -87,14 +87,14 @@ class ConfigurationStore(Store):
 
         self._overwrite_existing = overwrite_existing
 
-    def serialize(self, value):
+    def serialize(self, value):  # type: ignore[explicit-override] # FIXME
         if self.cloud_mode:
             # GXCloudStoreBackend expects a json str
             config_schema = value.get_schema_class()()
             return config_schema.dump(value)
         return value.to_yaml_str()
 
-    def deserialize(self, value):
+    def deserialize(self, value):  # type: ignore[explicit-override] # FIXME
         config = value
         if isinstance(value, str):
             config: CommentedMap = yaml.load(value)
@@ -104,7 +104,7 @@ class ConfigurationStore(Store):
             # Just to be explicit about what we intended to catch
             raise
         except marshmallow.ValidationError as e:
-            raise gx_exceptions.InvalidBaseYamlConfigError(  # noqa: TRY003
+            raise gx_exceptions.InvalidBaseYamlConfigError(  # noqa: TRY003 # FIXME CoP
                 f"Deserialized configuration failed validation: {e}"
             )
 
@@ -134,6 +134,6 @@ class ConfigurationStore(Store):
                 resource_name=name,
             )
         else:
-            key = ConfigurationIdentifier(configuration_key=name)  # type: ignore[arg-type]
+            key = ConfigurationIdentifier(configuration_key=name)  # type: ignore[arg-type] # FIXME CoP
 
         return key

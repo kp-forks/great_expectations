@@ -45,8 +45,9 @@ from great_expectations.data_context.store.datasource_store import (
 from great_expectations.data_context.store.gx_cloud_store_backend import (
     GXCloudStoreBackend,
 )
-from great_expectations.data_context.store.metric_store import SuiteParameterStore
-from great_expectations.data_context.store.validation_results_store import ValidationResultsStore
+from great_expectations.data_context.store.validation_results_store import (
+    ValidationResultsStore,
+)
 from great_expectations.data_context.types.base import (
     DataContextConfig,
     DataContextConfigDefaults,
@@ -81,25 +82,11 @@ class OrganizationIdNotSpecifiedError(Exception):
         )
 
 
-def _extract_fluent_datasources(config_dict: dict) -> dict:
-    """
-    When pulling from cloud config, FDS and BSD are nested under the `"datasources" key`.
-    We need to extract the fluent datasources otherwise the data context will attempt eager config
-    substitutions and other inappropriate operations.
-    """
-    datasources = config_dict.get("datasources", {})
-    fds_names: list[str] = []
-    for ds_name, ds in datasources.items():
-        if "type" in ds:
-            fds_names.append(ds_name)
-    return {name: datasources.pop(name) for name in fds_names}
-
-
 @public_api
 class CloudDataContext(SerializableDataContext):
-    """Subclass of AbstractDataContext that contains functionality necessary to work in a GX Cloud-backed environment."""  # noqa: E501
+    """Subclass of AbstractDataContext that contains functionality necessary to work in a GX Cloud-backed environment."""  # noqa: E501 # FIXME CoP
 
-    def __init__(  # noqa: PLR0913
+    def __init__(  # noqa: PLR0913 # FIXME CoP
         self,
         project_config: Optional[Union[DataContextConfig, Mapping]] = None,
         context_root_dir: Optional[PathStr] = None,
@@ -108,6 +95,7 @@ class CloudDataContext(SerializableDataContext):
         cloud_base_url: Optional[str] = None,
         cloud_access_token: Optional[str] = None,
         cloud_organization_id: Optional[str] = None,
+        user_agent_str: Optional[str] = None,
     ) -> None:
         """
         CloudDataContext constructor
@@ -117,7 +105,7 @@ class CloudDataContext(SerializableDataContext):
             runtime_environment (dict):  a dictionary of config variables that override both those set in
                 config_variables.yml and the environment
             cloud_config (GXCloudConfig): GXCloudConfig corresponding to current CloudDataContext
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         self._check_if_latest_version()
         self._cloud_config = self.get_cloud_config(
             cloud_base_url=cloud_base_url,
@@ -130,13 +118,14 @@ class CloudDataContext(SerializableDataContext):
         )
         self._project_config = self._init_project_config(project_config)
 
-        # The DataAssetStore is relevant only for CloudDataContexts and is not an explicit part of the project config.  # noqa: E501
+        # The DataAssetStore is relevant only for CloudDataContexts and is not an explicit part of the project config.  # noqa: E501 # FIXME CoP
         # As such, it must be instantiated separately.
         self._data_asset_store = self._init_data_asset_store()
 
         super().__init__(
             context_root_dir=self._context_root_directory,
             runtime_environment=runtime_environment,
+            user_agent_str=user_agent_str,
         )
 
     def _check_if_latest_version(self) -> None:
@@ -153,6 +142,7 @@ class CloudDataContext(SerializableDataContext):
             organization_id=uuid.UUID(organization_id) if organization_id else None,
             oss_id=self._get_oss_id(),
             cloud_mode=True,
+            user_agent_str=self._user_agent_str,
         )
 
     def _get_cloud_user_id(self) -> uuid.UUID | None:
@@ -216,7 +206,7 @@ class CloudDataContext(SerializableDataContext):
 
         Returns:
             bool: Is all the information needed to build a cloud_config is available?
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         cloud_config_dict = cls._get_cloud_config_dict(
             cloud_base_url=cloud_base_url,
             cloud_access_token=cloud_access_token,
@@ -234,13 +224,13 @@ class CloudDataContext(SerializableDataContext):
             context_root_dir=context_root_dir, project_root_dir=project_root_dir
         )
         if context_root_dir is None:
-            context_root_dir = os.getcwd()  # noqa: PTH109
+            context_root_dir = os.getcwd()  # noqa: PTH109 # FIXME CoP
             logger.debug(
                 f'context_root_dir was not provided - defaulting to current working directory "'
                 f'{context_root_dir}".'
             )
-        return os.path.abspath(  # noqa: PTH100
-            os.path.expanduser(context_root_dir)  # noqa: PTH111
+        return os.path.abspath(  # noqa: PTH100 # FIXME CoP
+            os.path.expanduser(context_root_dir)  # noqa: PTH111 # FIXME CoP
         )
 
     @classmethod
@@ -256,7 +246,7 @@ class CloudDataContext(SerializableDataContext):
         over the wire.
 
         :return: the configuration object retrieved from the Cloud API
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         response = cls._request_cloud_backend(
             cloud_config=cloud_config, resource="data_context_configuration"
         )
@@ -269,7 +259,8 @@ class CloudDataContext(SerializableDataContext):
         # to prevent downstream issues
         # This should be done before datasources are popped from the config below until
         # fluent_datasourcse are renamed datasourcess ()
-        config["fluent_datasources"] = _extract_fluent_datasources(config)
+        v1_data_sources = config.pop("data_sources", [])
+        config["fluent_datasources"] = {ds["name"]: ds for ds in v1_data_sources}
 
         # Various context variables are no longer top-level keys in V1
         for var in (
@@ -279,20 +270,19 @@ class CloudDataContext(SerializableDataContext):
             "include_rendered_content",
             "profiler_store_name",
             "anonymous_usage_statistics",
+            "evaluation_parameter_store_name",
+            "suite_parameter_store_name",
         ):
             val = config.pop(var, None)
             if val:
                 logger.info(f"Removed {var} from DataContextConfig while preparing V1 config")
 
-        # V1 renamed EvaluationParameters to SuiteParameters, and Validations to ValidationResults
+        # V1 renamed Validations to ValidationResults
         # so this is a temporary patch until Cloud implements a V1 endpoint for DataContextConfig
         cls._change_key_from_v0_to_v1(
             config,
-            "evaluation_parameter_store_name",
-            DataContextVariableSchema.SUITE_PARAMETER_STORE_NAME,
-        )
-        cls._change_key_from_v0_to_v1(
-            config, "validations_store_name", DataContextVariableSchema.VALIDATIONS_STORE_NAME
+            "validations_store_name",
+            DataContextVariableSchema.VALIDATIONS_STORE_NAME,
         )
 
         config = cls._prepare_stores_config(config=config)
@@ -309,17 +299,15 @@ class CloudDataContext(SerializableDataContext):
         for name, store in stores.items():
             # Certain stores have been renamed in V1
             cls._change_value_from_v0_to_v1(
-                store,
-                "class_name",
-                "EvaluationParameterStore",
-                SuiteParameterStore.__name__,
-            )
-            cls._change_value_from_v0_to_v1(
                 store, "class_name", "ValidationsStore", ValidationResultsStore.__name__
             )
 
             # Profiler stores are no longer supported in V1
-            if store.get("class_name") == "ProfilerStore":
+            if store.get("class_name") in [
+                "ProfilerStore",
+                "EvaluationParameterStore",
+                "SuiteParameterStore",
+            ]:
                 to_delete.append(name)
 
         for name in to_delete:
@@ -352,14 +340,14 @@ class CloudDataContext(SerializableDataContext):
         if not organization_id:
             raise OrganizationIdNotSpecifiedError()
 
-        session = create_session(access_token=access_token)
-        url = GXCloudStoreBackend.construct_versioned_url(base_url, organization_id, resource)
-        response = session.get(url)
+        with create_session(access_token=access_token) as session:
+            url = GXCloudStoreBackend.construct_versioned_url(base_url, organization_id, resource)
+            response = session.get(url)
 
         try:
             response.raise_for_status()
         except HTTPError:
-            raise gx_exceptions.GXCloudError(  # noqa: TRY003
+            raise gx_exceptions.GXCloudError(  # noqa: TRY003 # FIXME CoP
                 f"Bad request made to GX Cloud; {response.text}", response=response
             )
 
@@ -392,7 +380,7 @@ class CloudDataContext(SerializableDataContext):
 
         Raises:
             GXCloudError if a GX Cloud variable is missing
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         cloud_config_dict = cls._get_cloud_config_dict(
             cloud_base_url=cloud_base_url,
             cloud_access_token=cloud_access_token,
@@ -406,8 +394,8 @@ class CloudDataContext(SerializableDataContext):
         if len(missing_keys) > 0:
             missing_keys_str = [f'"{key}"' for key in missing_keys]
             global_config_path_str = [f'"{path}"' for path in super().GLOBAL_CONFIG_PATHS]
-            raise DataContextError(  # noqa: TRY003
-                f"{(', ').join(missing_keys_str)} arg(s) required for ge_cloud_mode but neither provided nor found in "  # noqa: E501
+            raise DataContextError(  # noqa: TRY003 # FIXME CoP
+                f"{(', ').join(missing_keys_str)} arg(s) required for ge_cloud_mode but neither provided nor found in "  # noqa: E501 # FIXME CoP
                 f"environment or in global configs ({(', ').join(global_config_path_str)})."
             )
 
@@ -457,7 +445,7 @@ class CloudDataContext(SerializableDataContext):
     @override
     def _init_datasources(self) -> None:
         # Note that Cloud does NOT populate self._datasources with existing objects on init.
-        # Objects are retrieved only when requested and are NOT cached (this differs in ephemeral/file-backed contexts).  # noqa: E501
+        # Objects are retrieved only when requested and are NOT cached (this differs in ephemeral/file-backed contexts).  # noqa: E501 # FIXME CoP
         self._datasources = DatasourceDict(
             context=self,
             datasource_store=self._datasource_store,
@@ -525,7 +513,7 @@ class CloudDataContext(SerializableDataContext):
     @override
     def _init_variables(self) -> CloudDataContextVariables:
         ge_cloud_base_url: str = self.ge_cloud_config.base_url
-        ge_cloud_organization_id: str = self.ge_cloud_config.organization_id  # type: ignore[assignment]
+        ge_cloud_organization_id: str = self.ge_cloud_config.organization_id  # type: ignore[assignment] # FIXME CoP
         ge_cloud_access_token: str = self.ge_cloud_config.access_token
 
         variables = CloudDataContextVariables(
@@ -544,7 +532,7 @@ class CloudDataContext(SerializableDataContext):
         If not, it should choose the id stored in DataContextConfig.
         Returns:
             UUID to use as the data_context_id
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         org_id = self.ge_cloud_config.organization_id
         if org_id:
             return uuid.UUID(org_id)
@@ -559,7 +547,7 @@ class CloudDataContext(SerializableDataContext):
         in order of precedence: cloud_config (for Data Contexts in GX Cloud mode), runtime_environment,
         environment variables, config_variables, or ge_cloud_config_variable_defaults (allows certain variables to
         be optional in GX Cloud mode).
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         if not config:
             config = self.config
 
@@ -582,10 +570,10 @@ class CloudDataContext(SerializableDataContext):
             )
             logger.info(
                 "Config variables were not found in environment or global config ("
-                f"{self.GLOBAL_CONFIG_PATHS}). Using default values instead. {missing_config_var_repr} ;"  # noqa: E501
+                f"{self.GLOBAL_CONFIG_PATHS}). Using default values instead. {missing_config_var_repr} ;"  # noqa: E501 # FIXME CoP
                 " If you would like to "
                 "use a different value, please specify it in an environment variable or in a "
-                "great_expectations.conf file located at one of the above paths, in a section named "  # noqa: E501
+                "great_expectations.conf file located at one of the above paths, in a section named "  # noqa: E501 # FIXME CoP
                 '"ge_cloud_config".'
             )
 
@@ -634,15 +622,16 @@ class CloudDataContext(SerializableDataContext):
         Explicitly override base class implementation to retain legacy behavior.
         """
         logger.debug(
-            "CloudDataContext._save_project_config() was called. Base class impl was override to be no-op to retain "  # noqa: E501
+            "CloudDataContext._save_project_config() was called. Base class impl was override to be no-op to retain "  # noqa: E501 # FIXME CoP
             "legacy behavior."
         )
 
     @override
     def _view_validation_result(self, result: CheckpointResult) -> None:
-        url = result.result_url
-        assert url, "Guaranteed to have a validation_result_url if generating a CheckpointResult in a Cloud-backed environment"  # noqa: E501
-        self._open_url_in_browser(url)
+        for validation_result in result.run_results.values():
+            url = validation_result.result_url
+            if url:
+                self._open_url_in_browser(url)
 
     @override
     def _add_datasource(

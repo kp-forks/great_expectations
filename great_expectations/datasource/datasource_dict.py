@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from collections import UserDict
 from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
 
@@ -8,7 +9,6 @@ import great_expectations.exceptions as gx_exceptions
 from great_expectations.compatibility.typing_extensions import override
 from great_expectations.datasource.fluent import Datasource as FluentDatasource
 from great_expectations.datasource.fluent.constants import _IN_MEMORY_DATA_ASSET_TYPE
-from great_expectations.exceptions.exceptions import DataContextError
 
 if TYPE_CHECKING:
     from great_expectations.data_context.data_context.abstract_data_context import (
@@ -42,14 +42,14 @@ class DatasourceDict(UserDict):
     d["my_fds"] = pandas_fds # Underlying DatasourceStore makes a `set()` call
     pandas_fds = d["my_fds"] # Underlying DatasourceStore makes a `get()` call
     ```
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     def __init__(
         self,
         context: AbstractDataContext,
         datasource_store: DatasourceStore,
     ):
-        self._context = context  # If possible, we should avoid passing the context through - once block-style is removed, we can extract this  # noqa: E501
+        self._context = context  # If possible, we should avoid passing the context through - once block-style is removed, we can extract this  # noqa: E501 # FIXME CoP
         self._datasource_store = datasource_store
         self._in_memory_data_assets: dict[str, DataAsset] = {}
 
@@ -65,17 +65,14 @@ class DatasourceDict(UserDict):
         (__setitem__, __getitem__, etc)
 
         This is generated just-in-time as the contents of the store may have changed.
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         datasources: dict[str, FluentDatasource] = {}
 
         configs = self._datasource_store.get_all()
         for config in configs:
+            name = config.name
             try:
-                if isinstance(config, FluentDatasource):
-                    name = config.name
-                    datasources[name] = self._init_fluent_datasource(name=name, ds=config)
-                else:
-                    raise DataContextError("Datasource is not a FluentDatasource")  # noqa: TRY003
+                datasources[name] = self._init_fluent_datasource(name=name, ds=config)
             except gx_exceptions.DatasourceInitializationError as e:
                 logger.warning(f"Cannot initialize datasource {name}: {e}")
 
@@ -106,7 +103,7 @@ class DatasourceDict(UserDict):
         try:
             return self._datasource_store.retrieve_by_name(name)
         except ValueError:
-            raise KeyError(f"Could not find a datasource named '{name}'")  # noqa: TRY003
+            raise KeyError(f"Could not find a datasource named '{name}'")  # noqa: TRY003 # FIXME CoP
 
     @override
     def __delitem__(self, name: str) -> None:
@@ -129,13 +126,7 @@ class DatasourceDict(UserDict):
                         datasource_name=name,
                         data_asset_name=asset.name,
                     )
-                    cached_data_asset = self._in_memory_data_assets.get(in_memory_asset_name)
-                    if cached_data_asset:
-                        asset.dataframe = cached_data_asset.dataframe
-                    else:
-                        # Asset is loaded into cache here (even without df) to enable loading of df at a later  # noqa: E501
-                        # time when DataframeAsset.build_batch_request(dataframe=df) is called
-                        self._in_memory_data_assets[in_memory_asset_name] = asset
+                    self._in_memory_data_assets[in_memory_asset_name] = asset
         return ds
 
 
@@ -145,7 +136,7 @@ class CacheableDatasourceDict(DatasourceDict):
 
     Any retrievals will firstly check an in-memory dictionary before requesting from the store. Other CRUD methods will ensure that
     both cache and store are kept in sync.
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     def __init__(
         self,
@@ -176,20 +167,26 @@ class CacheableDatasourceDict(DatasourceDict):
 
     @override
     def set_datasource(self, name: str, ds: FluentDatasource) -> FluentDatasource | None:
-        self.data[name] = ds
+        self.data[name] = self._add_ids(ds)
+        return ds
 
-        # FDS do not use stores
-        if not isinstance(ds, FluentDatasource):
-            return super().set_datasource(name=name, ds=ds)
+    def _add_ids(self, ds: FluentDatasource) -> FluentDatasource:
+        # File and ephemeral contexts do not use the store, so we need to add IDs here.
+        # Note that this is used for both `add` and `update` operations.
+        if ds.id is None:
+            ds.id = uuid.uuid4()
+        for asset in ds.assets:
+            if asset.id is None:
+                asset.id = uuid.uuid4()
+            for batch_definition in asset.batch_definitions:
+                if batch_definition.id is None:
+                    batch_definition.id = uuid.uuid4()
+
         return ds
 
     @override
     def __delitem__(self, name: str) -> None:
-        ds = self.data.pop(name, None)
-
-        # FDS do not use stores
-        if not isinstance(ds, FluentDatasource):
-            super().__delitem__(name)
+        self.data.pop(name, None)
 
     @override
     def __getitem__(self, name: str) -> FluentDatasource:

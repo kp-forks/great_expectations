@@ -41,7 +41,7 @@ from great_expectations.datasource.fluent.interfaces import Datasource
 from great_expectations.datasource.fluent.sources import (
     DEFAULT_PANDAS_DATA_ASSET_NAME,
     DEFAULT_PANDAS_DATASOURCE_NAME,
-    _SourceFactories,
+    DataSourceManager,
 )
 from great_expectations.datasource.fluent.sql_datasource import (
     SqlPartitionerYearAndMonth,
@@ -94,21 +94,6 @@ COMPLEX_CONFIG_DICT: Final[dict] = {
                             },
                         }
                     ],
-                },
-                {
-                    "order_by": [
-                        {"key": "year"},
-                        {"key": "month", "reverse": True},
-                    ],
-                    "table_name": "yet_another_table",
-                    "name": "with_sorters",
-                    "type": "table",
-                },
-                {
-                    "order_by": ["year", "-month"],
-                    "table_name": "yet_another_table",
-                    "name": "with_dslish_sorters",
-                    "type": "table",
                 },
             ],
         },
@@ -238,7 +223,7 @@ class TestExcludeUnsetAssetFields:
         ds_mapping = {"csv": "pandas_filesystem", "json": "pandas_filesystem"}
 
         ds_type_: str = ds_mapping[asset_dict_config["type"]]
-        ds_class = _SourceFactories.type_lookup[ds_type_]
+        ds_class = DataSourceManager.type_lookup[ds_type_]
 
         # fill in required args
         asset_dict_config.update(
@@ -269,7 +254,7 @@ class TestExcludeUnsetAssetFields:
     def test_from_gx_config(self, asset_dict: dict):
         """
         Ensure that unset fields are excluded even when being parsed by the top-level `GxConfig` class.
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         # fill in required args
         asset_dict.update(
             {
@@ -745,8 +730,8 @@ def test_assets_key_presence(inject_engine_lookup_double, from_yaml_gx_config: G
 
 # Marked via from_all_config fixture
 def test_partitioners_deserialization(inject_engine_lookup_double, from_all_config: GxConfig):
-    table_asset: TableAsset = from_all_config.get_datasource(datasource_name="my_pg_ds").get_asset(
-        asset_name="with_partitioner"
+    table_asset: TableAsset = from_all_config.get_datasource(name="my_pg_ds").get_asset(
+        name="with_partitioner"
     )
     partitioner = table_asset.batch_definitions[0].partitioner
     assert isinstance(partitioner, ColumnPartitionerMonthly)
@@ -766,23 +751,6 @@ def test_yaml_config_round_trip_ordering(
     assert dumped == PG_CONFIG_YAML_STR
 
 
-@pytest.mark.xfail(reason="Custom Sorter serialization logic needs to be implemented")
-@pytest.mark.big
-def test_custom_sorter_serialization(inject_engine_lookup_double, from_json_gx_config: GxConfig):
-    dumped: str = from_json_gx_config.json(indent=2)
-    print(f"  Dumped JSON ->\n\n{dumped}\n")
-
-    expected_sorter_strings: List[str] = COMPLEX_CONFIG_DICT[_FLUENT_DATASOURCES_KEY]["my_pg_ds"][
-        "assets"
-    ]["with_dslish_sorters"]["order_by"]
-
-    assert '"reverse": True' not in dumped
-    assert '{"key":' not in dumped
-
-    for sorter_str in expected_sorter_strings:
-        assert sorter_str in dumped, f"`{sorter_str}` not found in dumped json"
-
-
 @pytest.mark.big
 def test_dict_default_pandas_config_round_trip(inject_engine_lookup_double):
     # the default data asset should be dropped, but one named asset should remain
@@ -796,7 +764,7 @@ def test_dict_default_pandas_config_round_trip(inject_engine_lookup_double):
     assert (
         DEFAULT_PANDAS_DATA_ASSET_NAME
         not in from_dict_default_pandas_config.get_datasource(
-            datasource_name=DEFAULT_PANDAS_DATASOURCE_NAME
+            name=DEFAULT_PANDAS_DATASOURCE_NAME
         ).get_asset_names()
     )
 
@@ -898,9 +866,7 @@ def test_config_substitution_retains_original_value_on_save(
 
     print(context.fluent_config)
 
-    ds_w_subs: SqliteDatasource = context.fluent_config.get_datasource(
-        datasource_name="my_sqlite_ds_w_subs"
-    )  # type: ignore[assignment]
+    ds_w_subs: SqliteDatasource = context.fluent_config.get_datasource(name="my_sqlite_ds_w_subs")  # type: ignore[assignment] # FIXME CoP
 
     assert str(ds_w_subs.connection_string) == r"${MY_CONN_STR}"
     assert (
@@ -943,7 +909,7 @@ def test_config_substitution_retains_original_value_on_save_w_run_time_mods(
     datasources = context.fluent_datasources
 
     assert (
-        str(datasources["my_sqlite_ds_w_subs"].connection_string)  # type: ignore[attr-defined]
+        str(datasources["my_sqlite_ds_w_subs"].connection_string)  # type: ignore[attr-defined] # FIXME CoP
         == r"${MY_CONN_STR}"
     )
 
@@ -951,7 +917,7 @@ def test_config_substitution_retains_original_value_on_save_w_run_time_mods(
     context.data_sources.add_sqlite("my_new_one", connection_string="sqlite://")
 
     # add a new asset to an existing data
-    sqlite_ds_w_subs: SqliteDatasource = context.get_datasource(  # type: ignore[assignment]
+    sqlite_ds_w_subs: SqliteDatasource = context.data_sources.get(  # type: ignore[assignment] # FIXME CoP
         "my_sqlite_ds_w_subs"
     )
     sqlite_ds_w_subs.add_table_asset("new_asset", table_name="yellow_tripdata_sample_2019_01")

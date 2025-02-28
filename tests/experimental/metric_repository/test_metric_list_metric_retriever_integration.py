@@ -43,7 +43,7 @@ def cloud_context_and_batch_request_with_simple_dataframe(
 
     name = "dataframe"
     data_asset = datasource.add_dataframe_asset(name=name)
-    batch_request = data_asset.build_batch_request(dataframe=df)
+    batch_request = data_asset.build_batch_request(options={"dataframe": df})
     return context, batch_request
 
 
@@ -99,7 +99,7 @@ def test_get_metrics_table_metrics_only(
         ),
     ]
 
-    # Assert each metric so it is easier to see which one fails (instead of assert metrics == expected_metrics):  # noqa: E501
+    # Assert each metric so it is easier to see which one fails (instead of assert metrics == expected_metrics):  # noqa: E501 # FIXME CoP
     assert len(metrics) == len(expected_metrics)
     for metric in metrics:
         assert metric.dict() in [expected_metric.dict() for expected_metric in expected_metrics]

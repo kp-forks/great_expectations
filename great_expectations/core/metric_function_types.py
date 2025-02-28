@@ -3,14 +3,13 @@ from __future__ import annotations
 import enum
 import logging
 
-from great_expectations._docs_decorators import public_api
-
 logger = logging.getLogger(__name__)
 
 
-@public_api
 class MetricFunctionTypes(enum.Enum):
-    """Enum type, whose members depict the nature of return value of a metric implementation function (defined for a specified "ExecutionEngine" subclass) that is the final result (rather than a Callable for deferred execution).
+    """Enum type, whose members depict the nature of return value of a metric implementation function
+    (defined for a specified "ExecutionEngine" subclass) that is the final result
+    (rather than a Callable for deferred execution).
 
     The available types are:
 
@@ -23,14 +22,15 @@ class MetricFunctionTypes(enum.Enum):
       specified windowing operation over "Domain" values.
     - `AGGREGATE_VALUE` (never used and deprecated) -- metric implementation function returns the result of applying a
       specified aggregation operation to every "Domain" value.
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     VALUE = "value"
 
 
-@public_api
 class MetricPartialFunctionTypes(enum.Enum):
-    """Enum type, whose members depict the nature of return value of a metric implementation function (defined for a specified "ExecutionEngine" subclass) that is a (partial) Callable to be executed once execution plan is complete.
+    """Enum type, whose members depict the nature of return value of a metric implementation function
+    (defined for a specified "ExecutionEngine" subclass) that is a (partial)
+    Callable to be executed once execution plan is complete.
 
     The available types are:
 
@@ -54,7 +54,7 @@ class MetricPartialFunctionTypes(enum.Enum):
       specified aggregated quantity.
 
 
-    """  # noqa: E501
+    """  # noqa: E501 # FIXME CoP
 
     MAP_FN = "map_fn"  # pertains to "PandasExecutionEngine"
     MAP_SERIES = "map_series"  # pertains to "PandasExecutionEngine"
@@ -63,19 +63,18 @@ class MetricPartialFunctionTypes(enum.Enum):
         "map_condition_fn"  # pertains to "SqlAlchemyExecutionEngine" and "SparkDFExecutionEngine"
     )
     MAP_CONDITION_SERIES = "map_condition_series"  # pertains to "PandasExecutionEngine"
-    WINDOW_CONDITION_FN = "window_condition_fn"  # pertains to "SqlAlchemyExecutionEngine" and "SparkDFExecutionEngine"  # noqa: E501
+    WINDOW_CONDITION_FN = "window_condition_fn"  # pertains to "SqlAlchemyExecutionEngine" and "SparkDFExecutionEngine"  # noqa: E501 # FIXME CoP
     AGGREGATE_FN = (
         "aggregate_fn"  # pertains to "SqlAlchemyExecutionEngine" and "SparkDFExecutionEngine"
     )
 
     @property
-    @public_api
     def metric_suffix(self) -> str:
         """Examines the "name" property of this "Enum" and returns corresponding suffix for metric registration/usage.
 
         Returns:
             (str) designated metric name suffix
-        """  # noqa: E501
+        """  # noqa: E501 # FIXME CoP
         if self.name in [
             "MAP_FN",
             "MAP_SERIES",
@@ -96,18 +95,16 @@ class MetricPartialFunctionTypes(enum.Enum):
         return ""
 
 
-@public_api
 class MetricPartialFunctionTypeSuffixes(enum.Enum):
-    """Enum type, whose members specify available suffixes for metrics representing partial functions."""  # noqa: E501
+    """Enum type, whose members specify available suffixes for metrics representing partial functions."""  # noqa: E501 # FIXME CoP
 
     MAP = "map"
     CONDITION = "condition"
     AGGREGATE_FUNCTION = "aggregate_fn"
 
 
-@public_api
 class SummarizationMetricNameSuffixes(enum.Enum):
-    """Enum type, whose members specify suffixes for metrics used for summarizing Expectation validation results."""  # noqa: E501
+    """Enum type, whose members specify suffixes for metrics used for summarizing Expectation validation results."""  # noqa: E501 # FIXME CoP
 
     FILTERED_ROW_COUNT = "filtered_row_count"
     UNEXPECTED_COUNT = "unexpected_count"

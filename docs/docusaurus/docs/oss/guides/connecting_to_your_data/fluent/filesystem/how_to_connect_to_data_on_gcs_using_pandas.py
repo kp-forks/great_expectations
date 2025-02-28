@@ -25,7 +25,7 @@ datasource = context.data_sources.add_pandas_gcs(
 )
 # </snippet>
 
-assert datasource_name in context.datasources
+assert datasource_name in context.data_sources.all()
 
 # Python
 # <snippet name="docs/docusaurus/docs/oss/guides/connecting_to_your_data/fluent/filesystem/how_to_connect_to_data_on_gcs_using_pandas.py add_asset">
@@ -45,9 +45,8 @@ my_batch_definition = data_asset.add_batch_definition_monthly(
 my_batch_request = my_batch_definition.build_batch_request(
     {"year": "2019", "month": "03"}
 )
-batches = data_asset.get_batch_list_from_batch_request(my_batch_request)
-assert len(batches) == 1
-assert set(batches[0].columns()) == {
+batch = data_asset.get_batch(my_batch_request)
+assert set(batch.columns()) == {
     "vendor_id",
     "pickup_datetime",
     "dropoff_datetime",

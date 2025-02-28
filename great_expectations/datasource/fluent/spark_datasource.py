@@ -5,6 +5,7 @@ import warnings
 from pprint import pformat as pf
 from typing import (
     TYPE_CHECKING,
+    Any,
     ClassVar,
     Dict,
     Generic,
@@ -18,8 +19,6 @@ from typing import (
 
 import great_expectations.exceptions as gx_exceptions
 from great_expectations._docs_decorators import (
-    deprecated_argument,
-    new_argument,
     public_api,
 )
 from great_expectations.compatibility import pydantic
@@ -29,10 +28,13 @@ from great_expectations.compatibility.pydantic import (
     StrictInt,
     StrictStr,
 )
-from great_expectations.compatibility.pyspark import DataFrame, pyspark
+from great_expectations.compatibility.pyspark import ConnectDataFrame, DataFrame, pyspark
 from great_expectations.compatibility.typing_extensions import override
+from great_expectations.core import IDDict
+from great_expectations.core.batch import LegacyBatchDefinition
 from great_expectations.core.batch_spec import RuntimeDataBatchSpec
 from great_expectations.datasource.fluent import BatchParameters, BatchRequest
+from great_expectations.datasource.fluent.batch_identifier_util import make_batch_identifier
 from great_expectations.datasource.fluent.constants import (
     _DATA_CONNECTOR_NAME,
 )
@@ -43,11 +45,13 @@ from great_expectations.datasource.fluent.interfaces import (
     TestConnectionError,
     _DataAssetT,
 )
+from great_expectations.exceptions.exceptions import BuildBatchRequestError
 
 if TYPE_CHECKING:
-    from typing_extensions import TypeAlias
+    from typing_extensions import TypeAlias, TypeGuard
 
     from great_expectations.compatibility.pyspark import SparkSession
+    from great_expectations.core.batch_definition import BatchDefinition
     from great_expectations.core.partitioners import ColumnPartitioner
     from great_expectations.datasource.fluent.data_connector.batch_filter import BatchSlice
     from great_expectations.datasource.fluent.interfaces import BatchMetadata
@@ -82,16 +86,16 @@ class _SparkDatasource(Datasource):
             # deprecated-v1.0.0
             warnings.warn(
                 "force_reuse_spark_context is deprecated and will be removed in version 1.0. "
-                "In environments that allow it, the existing Spark context will be reused, adding the "  # noqa: E501
-                "spark_config options that have been passed. If the Spark context cannot be updated with "  # noqa: E501
-                "the spark_config, the context will be stopped and restarted with the new spark_config.",  # noqa: E501
+                "In environments that allow it, the existing Spark context will be reused, adding the "  # noqa: E501 # FIXME CoP
+                "spark_config options that have been passed. If the Spark context cannot be updated with "  # noqa: E501 # FIXME CoP
+                "the spark_config, the context will be stopped and restarted with the new spark_config.",  # noqa: E501 # FIXME CoP
                 category=DeprecationWarning,
             )
         return v
 
     @classmethod
     @override
-    def update_forward_refs(cls) -> None:  # type: ignore[override]
+    def update_forward_refs(cls) -> None:  # type: ignore[override] # FIXME CoP
         from great_expectations.compatibility.pyspark import SparkSession
 
         super().update_forward_refs(SparkSession=SparkSession)
@@ -125,7 +129,7 @@ class _SparkDatasource(Datasource):
 
     @override
     def get_execution_engine(self) -> SparkDFExecutionEngine:
-        # Method override is required because PrivateAttr _spark won't be passed into Execution Engine  # noqa: E501
+        # Method override is required because PrivateAttr _spark won't be passed into Execution Engine  # noqa: E501 # FIXME CoP
         # unless it is passed explicitly.
         current_execution_engine_kwargs = self.dict(
             exclude=self._get_exec_engine_excludes(),
@@ -161,25 +165,22 @@ class _SparkDatasource(Datasource):
         try:
             self.get_spark()
         except Exception as e:
-            raise TestConnectionError(e) from e
+            raise TestConnectionError(cause=e) from e
 
     # End Abstract Methods
 
 
+@public_api
 class DataFrameAsset(DataAsset, Generic[_SparkDataFrameT]):
+    """
+    A DataAsset that represents a Spark DataFrame.
+    """
+
     # instance attributes
     type: Literal["dataframe"] = "dataframe"
-    dataframe: Optional[_SparkDataFrameT] = pydantic.Field(default=None, exclude=True, repr=False)
 
     class Config:
         extra = pydantic.Extra.forbid
-
-    @pydantic.validator("dataframe")
-    def _validate_dataframe(cls, dataframe: DataFrame) -> DataFrame:
-        if not (DataFrame and isinstance(dataframe, DataFrame)):  # type: ignore[truthy-function]
-            raise ValueError("dataframe must be of type pyspark.sql.DataFrame")  # noqa: TRY003
-
-        return dataframe
 
     @override
     def test_connection(self) -> None: ...
@@ -188,27 +189,23 @@ class DataFrameAsset(DataAsset, Generic[_SparkDataFrameT]):
     def get_batch_parameters_keys(
         self, partitioner: Optional[ColumnPartitioner] = None
     ) -> tuple[str, ...]:
-        return tuple()
+        return tuple(
+            "dataframe",
+        )
 
     def _get_reader_method(self) -> str:
         raise NotImplementedError(
-            """Spark DataFrameAsset does not implement "_get_reader_method()" method, because DataFrame is already available."""  # noqa: E501
+            """Spark DataFrameAsset does not implement "_get_reader_method()" method, because DataFrame is already available."""  # noqa: E501 # FIXME CoP
         )
 
     def _get_reader_options_include(self) -> set[str]:
         raise NotImplementedError(
-            """Spark DataFrameAsset does not implement "_get_reader_options_include()" method, because DataFrame is already available."""  # noqa: E501
+            """Spark DataFrameAsset does not implement "_get_reader_options_include()" method, because DataFrame is already available."""  # noqa: E501 # FIXME CoP
         )
 
-    @new_argument(
-        argument_name="dataframe",
-        message='The "dataframe" argument is no longer part of "PandasDatasource.add_dataframe_asset()" method call; instead, "dataframe" is the required argument to "DataFrameAsset.build_batch_request()" method.',  # noqa: E501
-        version="0.16.15",
-    )
     @override
-    def build_batch_request(  # type: ignore[override]
+    def build_batch_request(
         self,
-        dataframe: Optional[_SparkDataFrameT] = None,
         options: Optional[BatchParameters] = None,
         batch_slice: Optional[BatchSlice] = None,
         partitioner: Optional[ColumnPartitioner] = None,
@@ -216,45 +213,39 @@ class DataFrameAsset(DataAsset, Generic[_SparkDataFrameT]):
         """A batch request that can be used to obtain batches for this DataAsset.
 
         Args:
-            dataframe: The Spark Dataframe containing the data for this DataFrame data asset.
-            options: This is not currently supported and must be {}/None for this data asset.
+            options: This should have 1 key, 'dataframe', whose value is the datafame to validate.
             batch_slice: This is not currently supported and must be None for this data asset.
             partitioner: This is not currently supported and must be None for this data asset.
 
 
         Returns:
-            A BatchRequest object that can be used to obtain a batch list from a Datasource by calling the
-            get_batch_list_from_batch_request method.
-        """  # noqa: E501
-        if options:
-            raise ValueError(  # noqa: TRY003
-                "options is not currently supported for this DataAssets and must be None or {}."
-            )
-
+            A BatchRequest object that can be used to obtain a batch from an Asset by calling the
+            get_batch method.
+        """
         if batch_slice is not None:
-            raise ValueError(  # noqa: TRY003
-                "batch_slice is not currently supported and must be None for this DataAsset."
+            raise BuildBatchRequestError(
+                message="batch_slice is not currently supported for this DataAsset "
+                "and must be None."
             )
 
         if partitioner is not None:
-            raise ValueError(  # noqa: TRY003
-                "partitioner is not currently supported and must be None for this DataAsset."
+            raise BuildBatchRequestError(
+                message="partitioner is not currently supported for this DataAsset "
+                "and must be None."
             )
 
-        if dataframe is None:
-            df = self.dataframe
-        else:
-            df = dataframe
+        if not (options is not None and "dataframe" in options and len(options) == 1):
+            raise BuildBatchRequestError(message="options must contain exactly 1 key, 'dataframe'.")
 
-        if df is None:
-            raise ValueError("Cannot build batch request for dataframe asset without a dataframe")  # noqa: TRY003
-
-        self.dataframe = df
+        if not self.is_spark_data_frame(options["dataframe"]):
+            raise BuildBatchRequestError(
+                message="Cannot build batch request without a Spark DataFrame."
+            )
 
         return BatchRequest(
             datasource_name=self.datasource.name,
             data_asset_name=self.name,
-            options={},
+            options=options,
         )
 
     @override
@@ -267,63 +258,93 @@ class DataFrameAsset(DataAsset, Generic[_SparkDataFrameT]):
         if not (
             batch_request.datasource_name == self.datasource.name
             and batch_request.data_asset_name == self.name
-            and not batch_request.options
+            and batch_request.options
+            and len(batch_request.options) == 1
+            and "dataframe" in batch_request.options
+            and self.is_spark_data_frame(batch_request.options["dataframe"])
         ):
             expect_batch_request_form = BatchRequest[None](
                 datasource_name=self.datasource.name,
                 data_asset_name=self.name,
                 options={},
-                batch_slice=batch_request._batch_slice_input,  # type: ignore[attr-defined]
+                batch_slice=batch_request._batch_slice_input,  # type: ignore[attr-defined] # FIXME CoP
             )
-            raise gx_exceptions.InvalidBatchRequestError(  # noqa: TRY003
+            raise gx_exceptions.InvalidBatchRequestError(  # noqa: TRY003 # FIXME CoP
                 "BatchRequest should have form:\n"
                 f"{pf(expect_batch_request_form.dict())}\n"
                 f"but actually has form:\n{pf(batch_request.dict())}\n"
             )
 
     @override
-    def get_batch_list_from_batch_request(self, batch_request: BatchRequest) -> list[Batch]:
+    def get_batch_identifiers_list(self, batch_request: BatchRequest) -> List[dict]:
+        return [IDDict(batch_request.options)]
+
+    @override
+    def get_batch(self, batch_request: BatchRequest) -> Batch:
         self._validate_batch_request(batch_request)
 
-        batch_spec = RuntimeDataBatchSpec(batch_data=self.dataframe)
+        batch_spec = RuntimeDataBatchSpec(batch_data=batch_request.options["dataframe"])
         execution_engine: SparkDFExecutionEngine = self.datasource.get_execution_engine()
         data, markers = execution_engine.get_batch_data_and_markers(batch_spec=batch_spec)
 
         # batch_definition (along with batch_spec and markers) is only here to satisfy a
         # legacy constraint when computing usage statistics in a validator. We hope to remove
         # it in the future.
-        # imports are done inline to prevent a circular dependency with core/batch.py
-        from great_expectations.core import IDDict
-        from great_expectations.core.batch import LegacyBatchDefinition
-
         batch_definition = LegacyBatchDefinition(
             datasource_name=self.datasource.name,
             data_connector_name=_DATA_CONNECTOR_NAME,
             data_asset_name=self.name,
-            batch_identifiers=IDDict(batch_request.options),
+            batch_identifiers=make_batch_identifier(batch_request.options),
             batch_spec_passthrough=None,
         )
 
         batch_metadata: BatchMetadata = self._get_batch_metadata_from_batch_request(
-            batch_request=batch_request
+            batch_request=batch_request, ignore_options=("dataframe",)
         )
 
-        return [
-            Batch(
-                datasource=self.datasource,
-                data_asset=self,
-                batch_request=batch_request,
-                data=data,
-                metadata=batch_metadata,
-                batch_markers=markers,
-                batch_spec=batch_spec,
-                batch_definition=batch_definition,
-            )
-        ]
+        return Batch(
+            datasource=self.datasource,
+            data_asset=self,
+            batch_request=batch_request,
+            data=data,
+            metadata=batch_metadata,
+            batch_markers=markers,
+            batch_spec=batch_spec,
+            batch_definition=batch_definition,
+        )
+
+    @public_api
+    def add_batch_definition_whole_dataframe(self, name: str) -> BatchDefinition:
+        """
+        Add a BatchDefinition that represents the entire DataFrame.
+
+        Args:
+            name: The name of the Batch Definition.
+
+        Returns:
+            A BatchDefinition object that represents the entire DataFrame.
+        """
+        return self.add_batch_definition(
+            name=name,
+            partitioner=None,
+        )
+
+    @staticmethod
+    def is_spark_data_frame(df: Any) -> TypeGuard[Union[DataFrame, ConnectDataFrame]]:
+        """Check that a given object is a Spark DataFrame.
+        This could either be a regular Spark DataFrame or a Spark Connect DataFrame.
+        """
+        data_frame_types = [DataFrame, ConnectDataFrame]
+        return any((cls and isinstance(df, cls)) for cls in data_frame_types)
 
 
 @public_api
 class SparkDatasource(_SparkDatasource):
+    """
+    A SparkDatasource is a Datasource that connects to a Spark cluster and provides
+    access to Spark DataFrames.
+    """
+
     # class attributes
     asset_types: ClassVar[List[Type[DataAsset]]] = [DataFrameAsset]
 
@@ -333,15 +354,9 @@ class SparkDatasource(_SparkDatasource):
     assets: List[DataFrameAsset] = []
 
     @public_api
-    @deprecated_argument(
-        argument_name="dataframe",
-        message='The "dataframe" argument is no longer part of "PandasDatasource.add_dataframe_asset()" method call; instead, "dataframe" is the required argument to "DataFrameAsset.build_batch_request()" method.',  # noqa: E501
-        version="0.16.15",
-    )
     def add_dataframe_asset(
         self,
         name: str,
-        dataframe: Optional[_SparkDataFrameT] = None,
         batch_metadata: Optional[BatchMetadata] = None,
     ) -> DataFrameAsset:
         """Adds a Dataframe DataAsset to this SparkDatasource object.
@@ -353,11 +368,10 @@ class SparkDatasource(_SparkDatasource):
                             batches created from the asset.
 
         Returns:
-            The DataFameAsset that has been added to this datasource.
-        """  # noqa: E501
+            The DataFrameAsset that has been added to this datasource.
+        """  # noqa: E501 # FIXME CoP
         asset: DataFrameAsset = DataFrameAsset(
             name=name,
             batch_metadata=batch_metadata or {},
         )
-        asset.dataframe = dataframe
         return self._add_asset(asset=asset)

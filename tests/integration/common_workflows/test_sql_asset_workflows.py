@@ -109,6 +109,55 @@ def _create_test_cases():
     ]
 
 
+def test_get_batch_identifiers_list__simple(
+    postgres_daily_batch_definition: BatchDefinition,
+) -> None:
+    batch_definition = postgres_daily_batch_definition
+    batch_identifiers_list = batch_definition.get_batch_identifiers_list()
+
+    assert len(batch_identifiers_list) == 10
+    # just spot check the edges
+    assert batch_identifiers_list[0] == {"year": None, "month": None, "day": None}
+    assert batch_identifiers_list[-1] == {"year": 2001, "month": 1, "day": 1}
+
+
+def test_get_batch_identifiers_list__respects_order(
+    postgres_daily_batch_definition_descending: BatchDefinition,
+) -> None:
+    batch_definition = postgres_daily_batch_definition_descending
+    batch_identifiers_list = batch_definition.get_batch_identifiers_list()
+
+    assert len(batch_identifiers_list) == 10
+    # just spot check the edges
+    assert batch_identifiers_list[0] == {"year": 2001, "month": 1, "day": 1}
+    assert batch_identifiers_list[-1] == {"year": None, "month": None, "day": None}
+
+
+def test_get_batch_identifiers_list__respects_batch_params(
+    postgres_daily_batch_definition: BatchDefinition,
+) -> None:
+    batch_definition = postgres_daily_batch_definition
+    batch_identifiers_list = batch_definition.get_batch_identifiers_list(
+        batch_parameters={"year": 2000}
+    )
+
+    assert len(batch_identifiers_list) == 6
+    # just spot check the edges
+    assert batch_identifiers_list[0] == {"year": 2000, "month": 1, "day": 1}
+    assert batch_identifiers_list[-1] == {"year": 2000, "month": 6, "day": 1}
+
+
+def test_get_batch_identifiers_list__no_batches(
+    postgres_daily_batch_definition: BatchDefinition,
+) -> None:
+    batch_definition = postgres_daily_batch_definition
+    batch_identifiers_list = batch_definition.get_batch_identifiers_list(
+        batch_parameters={"year": 1900}
+    )
+
+    assert batch_identifiers_list == []
+
+
 @pytest.mark.parametrize(
     ("expectation", "batch_definition_fixture_name", "batch_parameters"),
     _create_test_cases(),
@@ -156,14 +205,15 @@ def test_validation_definition_run(
     expectation: gxe.Expectation,
     batch_definition_fixture_name: str,
     batch_parameters: Optional[Dict],
+    context: AbstractDataContext,
     request: pytest.FixtureRequest,
 ) -> None:
     """Ensure ValidationDefinition::run works"""
 
     batch_definition = request.getfixturevalue(batch_definition_fixture_name)
-    suite = ExpectationSuite("my_suite", expectations=[expectation])
-    validation_definition = ValidationDefinition(
-        name="whatever", data=batch_definition, suite=suite
+    suite = context.suites.add(ExpectationSuite("my_suite", expectations=[expectation]))
+    validation_definition = context.validation_definitions.add(
+        ValidationDefinition(name="whatever", data=batch_definition, suite=suite)
     )
     result = validation_definition.run(batch_parameters=batch_parameters)
 
@@ -184,9 +234,9 @@ def test_checkpoint_run(
     """Ensure Checkpoint::run works"""
 
     batch_definition = request.getfixturevalue(batch_definition_fixture_name)
-    suite = ExpectationSuite("my_suite", expectations=[expectation])
-    validation_definition = ValidationDefinition(
-        name="whatever", data=batch_definition, suite=suite
+    suite = context.suites.add(ExpectationSuite("my_suite", expectations=[expectation]))
+    validation_definition = context.validation_definitions.add(
+        ValidationDefinition(name="whatever", data=batch_definition, suite=suite)
     )
     checkpoint = context.checkpoints.add(
         Checkpoint(name="whatever", validation_definitions=[validation_definition])

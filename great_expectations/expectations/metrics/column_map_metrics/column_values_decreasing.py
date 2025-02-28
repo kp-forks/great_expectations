@@ -45,7 +45,7 @@ class ColumnValuesDecreasing(ColumnMapMetricProvider):
         partial_fn_type=MetricPartialFunctionTypes.WINDOW_CONDITION_FN,
         domain_type=MetricDomainTypes.COLUMN,
     )
-    def _spark(  # noqa: PLR0913
+    def _spark(
         cls,
         execution_engine: SparkDFExecutionEngine,
         metric_domain_kwargs: dict,
@@ -65,7 +65,7 @@ class ColumnValuesDecreasing(ColumnMapMetricProvider):
                 pyspark.types.IntegerType,
             ),
         ):
-            # if column is any type that could have NA values, remove them (not filtered by .isNotNull())  # noqa: E501
+            # if column is any type that could have NA values, remove them (not filtered by .isNotNull())  # noqa: E501 # FIXME CoP
             compute_domain_kwargs = execution_engine.add_column_row_condition(
                 metric_domain_kwargs,
                 filter_null=cls.filter_column_isnull,
