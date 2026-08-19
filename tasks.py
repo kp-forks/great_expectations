@@ -552,6 +552,7 @@ SUPPORTED_EXPECTATIONS: Final[tuple[str, ...]] = (
     "ExpectColumnValuesToMatchRegexList",
     "ExpectColumnValuesToMatchStrftimeFormat",
     "ExpectColumnValuesToNotBeInSet",
+    "ExpectColumnValuesToNotBeOutliers",
     "ExpectColumnValuesToNotMatchLikePattern",
     "ExpectColumnValuesToNotMatchLikePatternList",
     "ExpectColumnValuesToNotMatchRegex",
