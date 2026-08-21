@@ -963,15 +963,15 @@ class TestStandardDataSourceListsMatchPreChangeMembership:
         ] == ALL_DATA_SOURCES
 
 
-class TestCuratedSqlDataSourcesEqualsClickHouseSingleStoreAndTrino:
+class TestCuratedSqlDataSourcesEqualsClickHouseOracleSingleStoreAndTrino:
     """Regression pin for the curated tier's members, in label order.
 
     `CURATED_SQL_DATA_SOURCES` was empty until a backend declared curated-tier membership, so
     every assertion involving it was vacuously true (empty equals empty). SingleStore was the
-    first backend to join that tier, Trino was the second, and ClickHouse is the third — all
-    three are what make this pin non-vacuous: it fails on a curated-tier backend registering
-    without also joining this literal, and fails just as loudly on the reverse — a config landing
-    in this literal without the corresponding registration.
+    first backend to join that tier, Trino was the second, ClickHouse was the third, and Oracle
+    is the fourth — all four are what make this pin non-vacuous: it fails on a curated-tier
+    backend registering without also joining this literal, and fails just as loudly on the
+    reverse — a config landing in this literal without the corresponding registration.
 
     `CURATED_SQL_DATA_SOURCES` is imported at this module's own import time (see the module
     docstring on `TestStandardDataSourceListsMatchPreChangeMembership` above for why that
@@ -980,11 +980,14 @@ class TestCuratedSqlDataSourcesEqualsClickHouseSingleStoreAndTrino:
     empty.
     """
 
-    def test_curated_sql_data_sources_equals_clickhouse_singlestore_and_trino_in_label_order(
+    def test_curated_sql_data_sources_equals_clickhouse_oracle_singlestore_and_trino_in_label_order(
         self,
     ) -> None:
         from tests.integration.test_utils.data_source_config.clickhouse import (
             ClickHouseDatasourceTestConfig,
+        )
+        from tests.integration.test_utils.data_source_config.oracle import (
+            OracleDatasourceTestConfig,
         )
         from tests.integration.test_utils.data_source_config.trino import (
             TrinoDatasourceTestConfig,
@@ -992,6 +995,7 @@ class TestCuratedSqlDataSourcesEqualsClickHouseSingleStoreAndTrino:
 
         assert [
             ClickHouseDatasourceTestConfig(),
+            OracleDatasourceTestConfig(),
             SingleStoreDatasourceTestConfig(),
             TrinoDatasourceTestConfig(),
         ] == CURATED_SQL_DATA_SOURCES
@@ -1044,7 +1048,7 @@ _REGISTERED_CURATED_SQL = tuple(sql_backends_for_tier(BackendTier.CURATED_SQL))
 _REGISTERED_SQL_BACKENDS: Tuple[type, ...] = tuple(iter_sql_backends())
 
 
-class TestRegisteredSqlBackendsEqualTheElevenInLabelOrder:
+class TestRegisteredSqlBackendsEqualTheTwelveInLabelOrder:
     """Pins the registry itself: every registered SQL backend, named individually, in label order.
 
     This is an *equality* assertion against an *ordered* literal naming every registered class -
@@ -1058,13 +1062,13 @@ class TestRegisteredSqlBackendsEqualTheElevenInLabelOrder:
     This module runs in a lane that installs no SQL dialect driver at all, and importing this
     module imports the whole harness package first, which in turn imports every backend module -
     each one registering itself as a side effect of being imported. An equality assertion over all
-    eleven registered classes therefore runs only in a process where every backend module imported
+    twelve registered classes therefore runs only in a process where every backend module imported
     successfully with every dialect driver absent.
 
     Be precise about which half of that each mechanism carries. A backend module that fails to
     import takes the whole package down with it, so every test here dies at collection - the
     import statement is what proves importability, not this assertion. What this assertion adds
-    is that all eleven modules actually *registered*: importing a module and registering from it
+    is that all twelve modules actually *registered*: importing a module and registering from it
     are separate events, and only the second is observable here. Weakening this to a subset or
     count check would discard exactly that, letting a backend that imported but never enrolled
     itself pass unnoticed.
@@ -1077,12 +1081,15 @@ class TestRegisteredSqlBackendsEqualTheElevenInLabelOrder:
     registered without a matching update here.
     """
 
-    def test_registered_backends_equal_the_eleven_in_label_order(self) -> None:
+    def test_registered_backends_equal_the_twelve_in_label_order(self) -> None:
         from tests.integration.test_utils.data_source_config.clickhouse import (
             ClickHouseDatasourceTestConfig,
         )
         from tests.integration.test_utils.data_source_config.mysql import (
             MySQLDatasourceTestConfig,
+        )
+        from tests.integration.test_utils.data_source_config.oracle import (
+            OracleDatasourceTestConfig,
         )
         from tests.integration.test_utils.data_source_config.redshift import (
             RedshiftDatasourceTestConfig,
@@ -1100,6 +1107,7 @@ class TestRegisteredSqlBackendsEqualTheElevenInLabelOrder:
             DatabricksDatasourceTestConfig,  # databricks
             SQLServerDatasourceTestConfig,  # mssql
             MySQLDatasourceTestConfig,  # mysql
+            OracleDatasourceTestConfig,  # oracle
             PostgreSQLDatasourceTestConfig,  # postgresql
             RedshiftDatasourceTestConfig,  # redshift
             SingleStoreDatasourceTestConfig,  # singlestore
