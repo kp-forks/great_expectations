@@ -1032,13 +1032,27 @@ MARKER_DEPENDENCY_MAP: Final[Mapping[str, TestDependencies]] = {
         ),
         services=("mssql", "trino"),
         extra_pytest_args=(
-            # TEMPORARY (CI transition): the Azure Blob, BigQuery, Redshift, and Snowflake
-            # backends are unavailable while their CI infrastructure is torn down.
-            # Requesting any of them makes test collection eagerly connect to a dead backend
-            # and abort the whole session, so only the available backends are requested here.
-            # Restore the remaining cloud/warehouse flags once the infra is back.
+            # Every backend this leg installs is requested here, and each flag makes test
+            # collection open a real connection -- so a flag whose backend is unreachable
+            # aborts the whole session rather than skipping its tests. Add one only once
+            # its marker leg is green.
+            #
+            # Two are deliberately left out, for different reasons.
+            #
+            # --azure: its dependencies are installed for imports, but there is no storage
+            # account or credential to connect to, so requesting it would abort collection.
+            #
+            # --snowflake: collection connects fine, but both Snowflake docs fixtures then
+            # fail loading their test data into the test database. That failure is not
+            # diagnosable from CI -- load_data_into_test_database deliberately swallows the
+            # SQLAlchemyError so credentials cannot reach the logs (tests/test_utils.py) --
+            # so it needs someone who can run it against Snowflake directly. The marker
+            # leg is green, so this is a fixture/permissions gap, not a dead backend.
             "--aws",
+            "--bigquery",
             "--gcs",
+            "--redshift",
+            "--sql-server",
             "--trino",
             "--docs-tests",
         ),
