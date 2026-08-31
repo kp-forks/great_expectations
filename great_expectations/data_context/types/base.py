@@ -60,8 +60,19 @@ if TYPE_CHECKING:
         BatchRequest as FluentBatchRequest,
     )
 
-yaml = YAML()
-yaml.indent(mapping=2, sequence=4, offset=2)
+
+def _build_yaml_handler() -> YAML:
+    """Build a YAML handler for a single dump.
+
+    A handler is deliberately not shared between dumps. ruamel binds the output
+    stream to the handler for the duration of a dump and only unbinds it on
+    success, so a handler that has raised mid-dump stays bound to the stream it
+    failed on and corrupts every later dump made through it.
+    """
+    handler = YAML()
+    handler.indent(mapping=2, sequence=4, offset=2)
+    return handler
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -80,7 +91,7 @@ def _validate_config_version(value: float) -> None:
 def object_to_yaml_str(obj):
     output_str: str
     with StringIO() as string_stream:
-        yaml.dump(obj, string_stream)
+        _build_yaml_handler().dump(obj, string_stream)
         output_str = string_stream.getvalue()
     return output_str
 
@@ -149,7 +160,7 @@ class BaseYamlConfig(SerializableDictDot):
         """
         :returns None (but writes a YAML file containing the project configuration)
         """
-        yaml.dump(self.commented_map, outfile)
+        _build_yaml_handler().dump(self.commented_map, outfile)
 
     def to_yaml_str(self) -> str:
         """
